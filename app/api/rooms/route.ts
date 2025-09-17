@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { RoomStatus } from "@prisma/client"
+import type { Session } from "next-auth"
 
 // Generate a unique room code
 function generateRoomCode(): string {
@@ -61,7 +62,7 @@ export async function GET() {
 // POST /api/rooms - Create a new room
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions) as Session | null
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Authentication required' },

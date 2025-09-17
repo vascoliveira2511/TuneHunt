@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { RoomStatus, GameStatus } from "@prisma/client"
+import type { Session } from "next-auth"
 
 interface Params {
   code: string
@@ -14,7 +15,7 @@ export async function POST(
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions) as Session | null
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Authentication required' },

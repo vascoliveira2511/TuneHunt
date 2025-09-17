@@ -110,7 +110,7 @@ export default function RoomPage() {
 
   const currentGame = room.games[0]
   const participants = currentGame?.participants || []
-  const isHost = session?.user?.id === room.host.id
+  const isHost = session?.user && 'id' in session.user ? session.user.id === room.host.id : false
 
   return (
     <div className="container mx-auto px-4 py-8">
