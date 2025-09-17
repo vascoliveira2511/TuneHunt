@@ -130,12 +130,17 @@ export async function POST(
 
       return NextResponse.json({ gameState })
     } else {
-      // For individual selection games, check if all players have selected songs
-      if (game.selectedSongs.length !== game.participants.length) {
+      // For individual selection games, allow starting with at least 1 song
+      if (game.selectedSongs.length === 0) {
         return NextResponse.json(
-          { error: 'Not all players have selected songs' },
+          { error: 'At least one player must select a song to start the game' },
           { status: 400 }
         )
+      }
+      
+      // If not all players have selected songs, that's okay - we'll use the available songs
+      if (game.selectedSongs.length < game.participants.length) {
+        console.log(`Starting game with ${game.selectedSongs.length} songs from ${game.participants.length} participants`)
       }
     }
 
@@ -165,7 +170,8 @@ export async function POST(
       timeRemaining: 30,
       isPlaying: false,
       guesses: [],
-      roundScores: {}
+      roundScores: {},
+      totalSongs: game.selectedSongs.length
     }
 
     return NextResponse.json({ gameState })

@@ -172,6 +172,7 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
   // Count how many players have selected tracks using real data
   const playersWithTracks = allSelections.length
   const allPlayersReady = playersWithTracks === participants.length
+  const canHostStart = isHost && playersWithTracks > 0
 
   return (
     <div className="space-y-6">
@@ -187,9 +188,9 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
                 Each player must select one track for others to guess
               </CardDescription>
             </div>
-            {isHost && allPlayersReady && onStartGame && (
-              <Button onClick={onStartGame} size="lg">
-                Start Game
+            {canHostStart && onStartGame && (
+              <Button onClick={onStartGame} size="lg" variant={allPlayersReady ? "default" : "outline"}>
+                {allPlayersReady ? "Start Game" : "Start Game (Some players haven't selected)"}
               </Button>
             )}
           </div>
@@ -326,14 +327,16 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
                 <div className="text-sm text-muted-foreground">
                   {allPlayersReady ? (
                     "All players ready! You can start the game."
+                  ) : canHostStart ? (
+                    `${playersWithTracks} of ${participants.length} players have selected tracks. You can start now or wait for more.`
                   ) : (
-                    `Waiting for ${participants.length - playersWithTracks} more players to select tracks...`
+                    `Waiting for players to select tracks... (${playersWithTracks} of ${participants.length} ready)`
                   )}
                 </div>
-                {allPlayersReady && onStartGame && (
-                  <Button onClick={onStartGame} size="lg">
+                {canHostStart && onStartGame && (
+                  <Button onClick={onStartGame} size="lg" variant={allPlayersReady ? "default" : "outline"}>
                     <Play className="h-4 w-4 mr-2" />
-                    Start Game
+                    {allPlayersReady ? "Start Game" : "Start Game Anyway"}
                   </Button>
                 )}
               </div>
