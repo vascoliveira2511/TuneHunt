@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -46,45 +46,44 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
   const [, setIsLoading] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  // Load existing selections function
+  const loadSelections = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/games/${gameId}/selections`)
+      if (response.ok) {
+        const data = await response.json()
+        setAllSelections(data.selections)
+        
+        // Find current user's selection
+        const userSelection = data.selections.find((s: { selectedBy: string }) => s.selectedBy === currentUserId)
+        if (userSelection) {
+          // Convert from database format back to Spotify format
+          const spotifyTrack: SpotifyTrack = {
+            id: userSelection.song.spotifyId,
+            name: userSelection.song.title,
+            artists: [{ name: userSelection.song.artist }],
+            album: {
+              name: userSelection.song.album || '',
+              images: userSelection.song.imageUrl ? [{ url: userSelection.song.imageUrl, height: 300, width: 300 }] : []
+            },
+            preview_url: userSelection.song.previewUrl,
+            external_urls: { spotify: '' },
+            duration_ms: userSelection.song.durationMs || 0
+          }
+          setSelectedTrack(spotifyTrack)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load selections:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [gameId, currentUserId])
+
   // Load existing selections on mount
   useEffect(() => {
-    const loadSelections = async () => {
-      try {
-        const response = await fetch(`/api/games/${gameId}/selections`)
-        if (response.ok) {
-          const data = await response.json()
-          console.log('Loaded selections:', data.selections)
-          console.log('Current user ID:', currentUserId)
-          setAllSelections(data.selections)
-          
-          // Find current user's selection
-          const userSelection = data.selections.find((s: { selectedBy: string }) => s.selectedBy === currentUserId)
-          if (userSelection) {
-            // Convert from database format back to Spotify format
-            const spotifyTrack: SpotifyTrack = {
-              id: userSelection.song.spotifyId,
-              name: userSelection.song.title,
-              artists: [{ name: userSelection.song.artist }],
-              album: {
-                name: userSelection.song.album || '',
-                images: userSelection.song.imageUrl ? [{ url: userSelection.song.imageUrl, height: 300, width: 300 }] : []
-              },
-              preview_url: userSelection.song.previewUrl,
-              external_urls: { spotify: '' },
-              duration_ms: userSelection.song.durationMs || 0
-            }
-            setSelectedTrack(spotifyTrack)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load selections:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     loadSelections()
-  }, [gameId, currentUserId])
+  }, [loadSelections])
 
   const handleTrackSelect = async (track: SpotifyTrack) => {
     setIsSubmitting(true)
@@ -104,6 +103,8 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
         const data = await response.json()
         console.log('Track selection saved:', data.selection)
         setSelectedTrack(track)
+        // Reload selections to update status display
+        loadSelections()
       } else {
         const error = await response.json()
         console.error('Failed to save track selection:', error.error)
@@ -289,8 +290,6 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
             <div className="grid gap-3">
               {participants.map((participant) => {
                 const hasSelected = allSelections.some(s => s.selectedBy === participant.user?.id)
-                console.log(`Participant ${participant.displayName}: user.id=${participant.user?.id}, hasSelected=${hasSelected}`)
-                console.log('All selections:', allSelections.map(s => ({ selectedBy: s.selectedBy, song: s.song.title })))
                 return (
                   <div key={participant.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-3">

@@ -76,10 +76,12 @@ export async function POST(
       })
 
       if (existingParticipant) {
-        return NextResponse.json(
-          { error: 'Already joined this game' },
-          { status: 400 }
-        )
+        // Instead of blocking, just return success (user is already in)
+        return NextResponse.json({
+          room,
+          participant: existingParticipant,
+          gameId: currentGame.id
+        })
       }
 
       // Check if game is full

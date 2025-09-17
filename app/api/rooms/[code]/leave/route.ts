@@ -108,7 +108,25 @@ export async function POST(
           })
         }
       } else {
-        // Regular participant leaving
+        // Regular participant leaving - check if room is now empty
+        const remainingParticipants = await prisma.gameParticipant.findMany({
+          where: {
+            gameId: currentGame.id
+          }
+        })
+
+        if (remainingParticipants.length === 0) {
+          // No participants left, delete the room
+          await prisma.room.delete({
+            where: { code }
+          })
+          
+          return NextResponse.json({ 
+            message: 'Room deleted - no participants remaining',
+            roomDeleted: true 
+          })
+        }
+
         return NextResponse.json({ 
           message: 'Left room successfully' 
         })
