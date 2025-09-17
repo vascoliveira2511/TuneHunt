@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, maxPlayers = 8, settings = {} } = body
+    const { name, maxPlayers = 8, settings = {}, playlistId } = body
 
     // Generate unique room code
     let roomCode = generateRoomCode()
@@ -118,6 +118,39 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // If playlist is provided, validate it exists
+    if (playlistId) {
+      const playlist = await prisma.playlist.findUnique({
+        where: { id: playlistId },
+        include: {
+          _count: {
+            select: { songs: true }
+          }
+        }
+      })
+
+      if (!playlist) {
+        return NextResponse.json(
+          { error: 'Playlist not found' },
+          { status: 404 }
+        )
+      }
+
+      if (!playlist.isPublished && playlist.createdBy !== session.user.id) {
+        return NextResponse.json(
+          { error: 'Playlist not accessible' },
+          { status: 403 }
+        )
+      }
+
+      if (playlist._count.songs < 5) {
+        return NextResponse.json(
+          { error: 'Playlist must have at least 5 songs' },
+          { status: 400 }
+        )
+      }
+    }
+
     const room = await prisma.room.create({
       data: {
         code: roomCode,
@@ -125,7 +158,14 @@ export async function POST(request: NextRequest) {
         name,
         maxPlayers,
         settings: JSON.stringify(settings),
-        status: RoomStatus.WAITING
+        status: RoomStatus.WAITING,
+        // Create initial game with playlist if provided
+        games: playlistId ? {
+          create: {
+            status: 'SELECTING',
+            playlistId: playlistId
+          }
+        } : undefined
       },
       include: {
         host: {
@@ -133,6 +173,19 @@ export async function POST(request: NextRequest) {
             id: true,
             name: true,
             image: true,
+          }
+        },
+        games: {
+          include: {
+            playlist: {
+              select: {
+                id: true,
+                name: true,
+                _count: {
+                  select: { songs: true }
+                }
+              }
+            }
           }
         }
       }
