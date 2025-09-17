@@ -92,7 +92,7 @@ export default function RoomPage() {
   // Handle leaving room when page unloads
   useEffect(() => {
     const handleBeforeUnload = async () => {
-      if (session?.user?.id && roomCode) {
+      if (session?.user && 'id' in session.user && session.user.id && roomCode) {
         try {
           // Use sendBeacon for reliable cleanup when page unloads
           const data = JSON.stringify({});
@@ -112,7 +112,7 @@ export default function RoomPage() {
       // Also cleanup when component unmounts
       handleBeforeUnload();
     };
-  }, [session?.user?.id, roomCode])
+  }, [session?.user, roomCode])
 
   const copyRoomCode = async () => {
     try {
@@ -191,7 +191,6 @@ export default function RoomPage() {
       })
 
       if (response.ok) {
-        const result = await response.json()
         router.push('/rooms')
       } else {
         const error = await response.json()

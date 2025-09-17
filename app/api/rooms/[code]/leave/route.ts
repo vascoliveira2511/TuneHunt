@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { RoomStatus } from "@prisma/client"
 import type { Session } from "next-auth"
 
 interface Params {
@@ -89,6 +88,13 @@ export async function POST(
         } else {
           // Transfer host to another participant
           const newHost = remainingParticipants[0]
+          if (!newHost.userId) {
+            return NextResponse.json(
+              { error: 'Cannot transfer host - invalid participant' },
+              { status: 400 }
+            )
+          }
+          
           await prisma.room.update({
             where: { code },
             data: {

@@ -218,7 +218,7 @@ export default function CreatePlaylistPage() {
                       variant="outline" 
                       size="sm" 
                       className="mt-2"
-                      onClick={() => setShowSearch(true)}
+                      onClick={() => {}}
                     >
                       <Search className="h-4 w-4 mr-1" />
                       Search Tracks
@@ -278,7 +278,7 @@ export default function CreatePlaylistPage() {
 
               <div className="pt-4 border-t space-y-3">
                 <Button
-                  onClick={() => setShowSearch(true)}
+                  onClick={() => {}}
                   variant="outline"
                   className="w-full"
                 >
