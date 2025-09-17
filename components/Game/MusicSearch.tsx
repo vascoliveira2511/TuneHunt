@@ -23,30 +23,44 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const searchTracks = useCallback(async (searchQuery: string) => {
+    console.log('🔍 Starting search for:', searchQuery)
+    
     if (!searchQuery.trim()) {
+      console.log('❌ Empty search query, clearing tracks')
       setTracks([])
       return
     }
 
+    console.log('⏳ Setting loading to true')
     setLoading(true)
+    
     try {
-      const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQuery)}&limit=10`)
+      const url = `/api/spotify/search?q=${encodeURIComponent(searchQuery)}&limit=10`
+      console.log('🌐 Fetching URL:', url)
+      
+      const response = await fetch(url)
+      console.log('📡 Response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
-        setTracks(data.tracks)
+        console.log('✅ Response data:', data)
+        setTracks(data.tracks || [])
       } else {
-        console.error('Failed to search tracks')
+        const errorData = await response.text()
+        console.error('❌ API Error:', response.status, errorData)
         setTracks([])
       }
     } catch (error) {
-      console.error('Error searching tracks:', error)
+      console.error('💥 Network Error:', error)
       setTracks([])
     } finally {
+      console.log('🏁 Setting loading to false')
       setLoading(false)
     }
   }, [])
 
   const handleSearch = () => {
+    console.log('🎯 handleSearch called with query:', query)
     searchTracks(query)
   }
 
