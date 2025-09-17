@@ -83,7 +83,13 @@ class SpotifyAPI {
     }
 
     const data: SpotifySearchResponse = await response.json()
-    return data.tracks.items.filter(track => track.preview_url !== null)
+    
+    console.log(`🎵 Spotify returned ${data.tracks.items.length} total tracks`)
+    const tracksWithPreviews = data.tracks.items.filter(track => track.preview_url !== null)
+    console.log(`🎧 ${tracksWithPreviews.length} tracks have preview URLs`)
+    
+    // Return all tracks for now, we'll handle preview availability in the UI
+    return data.tracks.items
   }
 
   async getTrack(trackId: string): Promise<SpotifyTrack> {
