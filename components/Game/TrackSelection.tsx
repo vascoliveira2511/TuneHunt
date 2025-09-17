@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ import type { SpotifyTrack } from "@/lib/spotify"
 
 interface TrackSelectionProps {
   roomCode: string
+  gameId: string
   currentUserId: string
   isHost: boolean
   participants: Array<{
@@ -26,33 +27,99 @@ interface TrackSelectionProps {
   onStartGame?: () => void
 }
 
-export default function TrackSelection({ roomCode, currentUserId, isHost, participants, onStartGame }: TrackSelectionProps) {
+export default function TrackSelection({ roomCode, gameId, currentUserId, isHost, participants, onStartGame }: TrackSelectionProps) {
   const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | null>(null)
   const [playingTrack, setPlayingTrack] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [allSelections, setAllSelections] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  // Load existing selections on mount
+  useEffect(() => {
+    const loadSelections = async () => {
+      try {
+        const response = await fetch(`/api/games/${gameId}/selections`)
+        if (response.ok) {
+          const data = await response.json()
+          setAllSelections(data.selections)
+          
+          // Find current user's selection
+          const userSelection = data.selections.find((s: any) => s.selectedBy === currentUserId)
+          if (userSelection) {
+            // Convert from database format back to Spotify format
+            const spotifyTrack: SpotifyTrack = {
+              id: userSelection.song.spotifyId,
+              name: userSelection.song.title,
+              artists: [{ name: userSelection.song.artist }],
+              album: {
+                name: userSelection.song.album || '',
+                images: userSelection.song.imageUrl ? [{ url: userSelection.song.imageUrl, height: 300, width: 300 }] : []
+              },
+              preview_url: userSelection.song.previewUrl,
+              external_urls: { spotify: '' },
+              duration_ms: userSelection.song.durationMs || 0
+            }
+            setSelectedTrack(spotifyTrack)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load selections:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadSelections()
+  }, [gameId, currentUserId])
+
   const handleTrackSelect = async (track: SpotifyTrack) => {
-    setSelectedTrack(track)
     setIsSubmitting(true)
     
     try {
-      // TODO: Save user's track selection to database
       console.log('Saving track selection:', track.name, 'by', track.artists[0].name)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      const response = await fetch(`/api/games/${gameId}/selections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ spotifyTrack: track }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Track selection saved:', data.selection)
+        setSelectedTrack(track)
+      } else {
+        const error = await response.json()
+        console.error('Failed to save track selection:', error.error)
+        alert(error.error || 'Failed to save track selection')
+      }
     } catch (error) {
       console.error('Failed to save track selection:', error)
+      alert('Failed to save track selection')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleRemoveSelection = () => {
-    setSelectedTrack(null)
-    // TODO: Remove from database
+  const handleRemoveSelection = async () => {
+    try {
+      const response = await fetch(`/api/games/${gameId}/selections`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setSelectedTrack(null)
+        console.log('Track selection removed')
+      } else {
+        const error = await response.json()
+        console.error('Failed to remove track selection:', error.error)
+      }
+    } catch (error) {
+      console.error('Failed to remove track selection:', error)
+    }
   }
 
   const playPreview = (track: SpotifyTrack) => {
@@ -91,8 +158,8 @@ export default function TrackSelection({ roomCode, currentUserId, isHost, partic
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
-  // Count how many players have selected tracks (mock data for now)
-  const playersWithTracks = participants.filter(p => p.id === currentUserId && selectedTrack).length
+  // Count how many players have selected tracks using real data
+  const playersWithTracks = allSelections.length
   const allPlayersReady = playersWithTracks === participants.length
 
   return (
@@ -206,37 +273,38 @@ export default function TrackSelection({ roomCode, currentUserId, isHost, partic
           <div className="mt-6 pt-6 border-t">
             <h3 className="font-medium mb-3">Player Status ({playersWithTracks}/{participants.length} ready)</h3>
             <div className="grid gap-3">
-              {participants.map((participant) => (
-                <div key={participant.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={participant.user?.image} />
-                      <AvatarFallback>
-                        {participant.displayName?.[0] || participant.user?.name?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium text-sm">
-                      {participant.displayName || participant.user?.name}
-                    </span>
+              {participants.map((participant) => {
+                const hasSelected = allSelections.some(s => s.selectedBy === participant.user?.id)
+                return (
+                  <div key={participant.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={participant.user?.image} />
+                        <AvatarFallback>
+                          {participant.displayName?.[0] || participant.user?.name?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium text-sm">
+                        {participant.displayName || participant.user?.name}
+                      </span>
+                    </div>
+                    
+                    <Badge variant={hasSelected ? "secondary" : "outline"}>
+                      {hasSelected ? (
+                        <>
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Ready
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="h-3 w-3 mr-1" />
+                          Selecting...
+                        </>
+                      )}
+                    </Badge>
                   </div>
-                  
-                  <Badge variant={
-                    participant.id === currentUserId && selectedTrack ? "secondary" : "outline"
-                  }>
-                    {participant.id === currentUserId && selectedTrack ? (
-                      <>
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Ready
-                      </>
-                    ) : (
-                      <>
-                        <Clock className="h-3 w-3 mr-1" />
-                        Selecting...
-                      </>
-                    )}
-                  </Badge>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 

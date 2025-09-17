@@ -112,6 +112,7 @@ export default function RoomPage() {
   const currentGame = room.games[0]
   const participants = currentGame?.participants || []
   const isHost = session?.user && 'id' in session.user ? session.user.id === room.host.id : false
+  const gameId = currentGame?.id
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -226,10 +227,11 @@ export default function RoomPage() {
       </div>
 
       {/* Track Selection for all players when room is waiting */}
-      {room.status === 'WAITING' && (
+      {room.status === 'WAITING' && gameId && (
         <div className="mt-8">
           <TrackSelection 
             roomCode={roomCode}
+            gameId={gameId}
             currentUserId={session?.user?.id || ''}
             isHost={isHost}
             participants={participants}
