@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Users, Crown, Copy, Settings } from "lucide-react"
+import PlaylistManager from "@/components/Game/PlaylistManager"
 
 interface Room {
   id: string
@@ -223,6 +224,19 @@ export default function RoomPage() {
           </Card>
         </div>
       </div>
+
+      {/* Playlist Manager for hosts when room is waiting */}
+      {room.status === 'WAITING' && (
+        <div className="mt-8">
+          <PlaylistManager 
+            isHost={isHost}
+            onStartGame={() => {
+              // TODO: Implement start game logic
+              console.log('Starting game...')
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

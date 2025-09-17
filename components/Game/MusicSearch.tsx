@@ -1,0 +1,231 @@
+"use client"
+
+import { useState, useCallback, useRef, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Search, Play, Pause, Plus, Volume2, VolumeX } from "lucide-react"
+import type { SpotifyTrack } from "@/lib/spotify"
+
+interface MusicSearchProps {
+  onTrackSelect: (track: SpotifyTrack) => void
+  selectedTracks?: SpotifyTrack[]
+}
+
+export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: MusicSearchProps) {
+  const [query, setQuery] = useState("")
+  const [tracks, setTracks] = useState<SpotifyTrack[]>([])
+  const [loading, setLoading] = useState(false)
+  const [playingTrack, setPlayingTrack] = useState<string | null>(null)
+  const [audioVolume, setAudioVolume] = useState(0.3)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const searchTracks = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim()) {
+      setTracks([])
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQuery)}&limit=10`)
+      if (response.ok) {
+        const data = await response.json()
+        setTracks(data.tracks)
+      } else {
+        console.error('Failed to search tracks')
+        setTracks([])
+      }
+    } catch (error) {
+      console.error('Error searching tracks:', error)
+      setTracks([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleSearch = () => {
+    searchTracks(query)
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch()
+    }
+  }
+
+  const playPreview = (track: SpotifyTrack) => {
+    if (!track.preview_url) return
+
+    if (playingTrack === track.id) {
+      audioRef.current?.pause()
+      setPlayingTrack(null)
+      return
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
+    const audio = new Audio(track.preview_url)
+    audio.volume = audioVolume
+    audioRef.current = audio
+
+    audio.play().catch(console.error)
+    setPlayingTrack(track.id)
+
+    audio.onended = () => {
+      setPlayingTrack(null)
+    }
+
+    audio.onerror = () => {
+      setPlayingTrack(null)
+      console.error('Failed to play preview')
+    }
+  }
+
+
+  const formatDuration = (ms: number) => {
+    const seconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  const isTrackSelected = (track: SpotifyTrack) => {
+    return selectedTracks.some(selected => selected.id === track.id)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+    }
+  }, [])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Input
+            type="text"
+            placeholder="Search for songs, artists, or albums..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="pl-10"
+          />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        </div>
+        <Button onClick={handleSearch} disabled={loading || !query.trim()}>
+          {loading ? "Searching..." : "Search"}
+        </Button>
+      </div>
+
+      {/* Volume Control */}
+      <div className="flex items-center gap-2">
+        <VolumeX className="h-4 w-4 text-muted-foreground" />
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={audioVolume}
+          onChange={(e) => {
+            const volume = parseFloat(e.target.value)
+            setAudioVolume(volume)
+            if (audioRef.current) {
+              audioRef.current.volume = volume
+            }
+          }}
+          className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+        />
+        <Volume2 className="h-4 w-4 text-muted-foreground" />
+      </div>
+
+      {/* Search Results */}
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        {tracks.map((track) => (
+          <Card key={track.id} className="transition-all hover:bg-accent/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Avatar className="h-12 w-12 rounded-md">
+                    <AvatarImage 
+                      src={track.album.images[0]?.url} 
+                      alt={track.album.name}
+                    />
+                    <AvatarFallback className="rounded-md">
+                      {track.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{track.name}</div>
+                    <div className="text-sm text-muted-foreground truncate">
+                      {track.artists.map(artist => artist.name).join(', ')}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {track.album.name} • {formatDuration(track.duration_ms)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {track.preview_url && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => playPreview(track)}
+                      className="h-8 w-8 p-0"
+                    >
+                      {playingTrack === track.id ? (
+                        <Pause className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+                  
+                  <Button
+                    variant={isTrackSelected(track) ? "secondary" : "default"}
+                    size="sm"
+                    onClick={() => onTrackSelect(track)}
+                    disabled={isTrackSelected(track)}
+                    className="h-8"
+                  >
+                    {isTrackSelected(track) ? (
+                      <Badge variant="secondary" className="h-6 px-2">
+                        Added
+                      </Badge>
+                    ) : (
+                      <>
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        {tracks.length === 0 && query && !loading && (
+          <div className="text-center py-8 text-muted-foreground">
+            No tracks found for &quot;{query}&quot;
+          </div>
+        )}
+
+        {tracks.length === 0 && !query && (
+          <div className="text-center py-8 text-muted-foreground">
+            Search for songs to add to your game
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

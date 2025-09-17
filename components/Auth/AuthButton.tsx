@@ -25,7 +25,6 @@ export function AuthButton() {
         variant="ghost" 
         size="sm" 
         onClick={() => signIn("google")}
-        className="ml-2"
       >
         <LogIn className="h-4 w-4 mr-2" />
         Sign In
@@ -36,11 +35,14 @@ export function AuthButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={session.user?.image || ""} alt={session.user?.name || ""} />
-            <AvatarFallback>
-              <User className="h-4 w-4" />
+            <AvatarImage 
+              src={session.user?.image || ""} 
+              alt={session.user?.name || "User"} 
+            />
+            <AvatarFallback className="bg-primary/10">
+              {session.user?.name?.[0]?.toUpperCase() || <User className="h-4 w-4" />}
             </AvatarFallback>
           </Avatar>
         </Button>
