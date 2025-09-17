@@ -29,6 +29,7 @@ interface Room {
   games: Array<{
     id: string
     status: string
+    playlistId?: string
     participants: Array<{
       id: string
       displayName: string
@@ -246,6 +247,7 @@ export default function RoomPage() {
   const isHost = session?.user && 'id' in session.user ? (session.user as { id: string }).id === room.host.id : false
   const gameId = currentGame?.id
   const gameStatus = currentGame?.status
+  const isPlaylistGame = currentGame?.playlistId != null
 
   const handleStartGame = async () => {
     if (!gameId) return
@@ -499,7 +501,7 @@ export default function RoomPage() {
       </div>
 
       {/* Waiting for host to start (playlist mode) */}
-      {gameStatus === 'WAITING' && gameId && (
+      {gameStatus === 'SELECTING' && isPlaylistGame && gameId && (
         <div className="mt-8">
           <Card>
             <CardHeader>
@@ -524,7 +526,7 @@ export default function RoomPage() {
       )}
 
       {/* Track Selection for all players when game is in SELECTING status */}
-      {gameStatus === 'SELECTING' && gameId && (
+      {gameStatus === 'SELECTING' && !isPlaylistGame && gameId && (
         <div className="mt-8">
           <TrackSelection 
             gameId={gameId}

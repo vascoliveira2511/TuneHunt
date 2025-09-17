@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         // Always create initial game with host as participant
         games: {
           create: {
-            status: playlistId ? 'WAITING' : 'SELECTING',
+            status: 'SELECTING',
             playlistId: playlistId || undefined,
             participants: {
               create: {

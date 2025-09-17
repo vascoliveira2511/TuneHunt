@@ -240,7 +240,7 @@ export default function RoomsPage() {
             const currentGame = room.games[0]
             const participantCount = currentGame?.participants?.length || 0
             const canJoin = currentGame ? 
-              ((currentGame.status === 'SELECTING' || currentGame.status === 'WAITING') && participantCount < room.maxPlayers) :
+              (currentGame.status === 'SELECTING' && participantCount < room.maxPlayers) :
               (room.status === 'WAITING')
             
             return (
