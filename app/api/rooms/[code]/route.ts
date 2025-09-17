@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
+import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
@@ -10,10 +10,10 @@ interface Params {
 // GET /api/rooms/[code] - Get room by code
 export async function GET(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Promise<Params> }
 ) {
   try {
-    const { code } = params
+    const { code } = await params
 
     const room = await prisma.room.findUnique({
       where: { code },
@@ -67,7 +67,7 @@ export async function GET(
 // PUT /api/rooms/[code] - Update room (host only)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Promise<Params> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -78,7 +78,7 @@ export async function PUT(
       )
     }
 
-    const { code } = params
+    const { code } = await params
     const body = await request.json()
 
     // Find the room and verify the user is the host
@@ -132,7 +132,7 @@ export async function PUT(
 // DELETE /api/rooms/[code] - Delete room (host only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Promise<Params> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -143,7 +143,7 @@ export async function DELETE(
       )
     }
 
-    const { code } = params
+    const { code } = await params
 
     // Find the room and verify the user is the host
     const room = await prisma.room.findUnique({

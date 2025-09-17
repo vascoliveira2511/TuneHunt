@@ -10,7 +10,12 @@
       "Bash(npm run dev:*)",
       "Bash(npx prisma:*)",
       "Bash(npx next:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

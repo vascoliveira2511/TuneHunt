@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
+import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { RoomStatus, GameStatus } from "@prisma/client"
@@ -11,7 +11,7 @@ interface Params {
 // POST /api/rooms/[code]/join - Join a room
 export async function POST(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Promise<Params> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -22,7 +22,7 @@ export async function POST(
       )
     }
 
-    const { code } = params
+    const { code } = await params
     const body = await request.json()
     const { displayName } = body
 
