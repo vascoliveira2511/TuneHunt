@@ -1,0 +1,283 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users table
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  displayName   String?
+  provider      String?
+  providerId    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth.js relations
+  accounts Account[]
+  sessions Session[]
+
+  // Game relations
+  hostedRooms       Room[]         @relation("RoomHost")
+  gameParticipants  GameParticipant[]
+  guesses          Guess[]
+  bookmarks        UserBookmark[]
+  playlistRatings  PlaylistRating[]
+  playlists        Playlist[]
+  selectedSongs    GameSelectedSong[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
+
+// Rooms table
+model Room {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  hostId      String
+  name        String?
+  maxPlayers  Int      @default(8)
+  status      RoomStatus @default(WAITING)
+  settings    String   @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  host        User     @relation("RoomHost", fields: [hostId], references: [id])
+  games       Game[]
+
+  @@map("rooms")
+}
+
+enum RoomStatus {
+  WAITING
+  SELECTING
+  PLAYING
+  FINISHED
+}
+
+// Playlists table
+model Playlist {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdBy   String?
+  isOfficial  Boolean  @default(false)
+  isPublished Boolean  @default(false)
+  status      PlaylistStatus @default(PENDING)
+  playAsIs    Boolean  @default(false)
+  rating      Float    @default(0)
+  ratingCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator         User?            @relation(fields: [createdBy], references: [id])
+  songs           PlaylistSong[]
+  games           Game[]
+  ratings         PlaylistRating[]
+
+  @@map("playlists")
+}
+
+enum PlaylistStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Songs table
+model Song {
+  id         String   @id @default(cuid())
+  spotifyId  String?  @unique
+  title      String
+  artist     String
+  album      String?
+  previewUrl String?
+  imageUrl   String?
+  durationMs Int?
+  createdAt  DateTime @default(now())
+
+  playlistSongs     PlaylistSong[]
+  gameSelectedSongs GameSelectedSong[]
+  guesses          Guess[]
+  bookmarks        UserBookmark[]
+  currentGames     Game[]
+
+  @@map("songs")
+}
+
+// Playlist songs junction table
+model PlaylistSong {
+  id         String   @id @default(cuid())
+  playlistId String
+  songId     String
+  position   Int
+  createdAt  DateTime @default(now())
+
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  song       Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@map("playlist_songs")
+}
+
+// Games table
+model Game {
+  id               String   @id @default(cuid())
+  roomId           String
+  playlistId       String?
+  currentSongIndex Int      @default(0)
+  currentSongId    String?
+  status           GameStatus @default(SELECTING)
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime @default(now())
+
+  room              Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  playlist          Playlist?          @relation(fields: [playlistId], references: [id])
+  currentSong       Song?              @relation(fields: [currentSongId], references: [id])
+  participants      GameParticipant[]
+  selectedSongs     GameSelectedSong[]
+  guesses           Guess[]
+
+  @@map("games")
+}
+
+enum GameStatus {
+  SELECTING
+  PLAYING
+  FINISHED
+}
+
+// Game participants table
+model GameParticipant {
+  id           String   @id @default(cuid())
+  gameId       String
+  userId       String?
+  displayName  String?
+  score        Int      @default(0)
+  songsSelected Int     @default(0)
+  joinedAt     DateTime @default(now())
+
+  game         Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user         User?    @relation(fields: [userId], references: [id])
+
+  @@map("game_participants")
+}
+
+// Selected songs table (songs chosen by players for the game)
+model GameSelectedSong {
+  id         String   @id @default(cuid())
+  gameId     String
+  songId     String
+  selectedBy String?
+  playOrder  Int?
+  createdAt  DateTime @default(now())
+
+  game       Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  song       Song     @relation(fields: [songId], references: [id])
+  selector   User?    @relation(fields: [selectedBy], references: [id])
+
+  @@map("game_selected_songs")
+}
+
+// Guesses table
+model Guess {
+  id              String   @id @default(cuid())
+  gameId          String
+  userId          String?
+  songId          String
+  guessType       GuessType
+  guessText       String
+  isCorrect       Boolean
+  pointsAwarded   Int      @default(0)
+  secondsRemaining Int
+  createdAt       DateTime @default(now())
+
+  game            Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user            User?    @relation(fields: [userId], references: [id])
+  song            Song     @relation(fields: [songId], references: [id])
+
+  @@map("guesses")
+}
+
+enum GuessType {
+  TITLE
+  ARTIST
+}
+
+// User bookmarks
+model UserBookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  songId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, songId])
+  @@map("user_bookmarks")
+}
+
+// Playlist ratings
+model PlaylistRating {
+  id         String   @id @default(cuid())
+  playlistId String
+  userId     String
+  rating     Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, userId])
+  @@map("playlist_ratings")
+}
