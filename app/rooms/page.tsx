@@ -70,6 +70,13 @@ export default function RoomsPage() {
     }
 
     fetchRooms()
+    
+    // Set up polling to refresh rooms every 10 seconds
+    const pollInterval = setInterval(fetchRooms, 10000)
+    
+    return () => {
+      clearInterval(pollInterval)
+    }
   }, [])
 
   const handleCreateRoom = () => {
@@ -232,7 +239,9 @@ export default function RoomsPage() {
           {filteredRooms.map((room) => {
             const currentGame = room.games[0]
             const participantCount = currentGame?.participants?.length || 0
-            const canJoin = room.status === 'WAITING' && participantCount < room.maxPlayers
+            const canJoin = currentGame ? 
+              ((currentGame.status === 'SELECTING' || currentGame.status === 'WAITING') && participantCount < room.maxPlayers) :
+              (room.status === 'WAITING')
             
             return (
               <Card key={room.id} className="hover:shadow-lg transition-shadow">
@@ -245,9 +254,9 @@ export default function RoomsPage() {
                         </h3>
                         <Badge 
                           variant="outline" 
-                          className={getStatusColor(room.status)}
+                          className={getStatusColor(currentGame?.status || room.status)}
                         >
-                          {getStatusText(room.status)}
+                          {getStatusText(currentGame?.status || room.status)}
                         </Badge>
                         <code className="text-sm bg-muted px-2 py-1 rounded">
                           {room.code}
@@ -298,9 +307,10 @@ export default function RoomsPage() {
                         </Button>
                       ) : (
                         <Button variant="outline" disabled>
-                          {room.status === 'FINISHED' ? 'Game Ended' : 
+                          {currentGame?.status === 'FINISHED' || room.status === 'FINISHED' ? 'Game Ended' : 
                            participantCount >= room.maxPlayers ? 'Room Full' : 
-                           'In Progress'}
+                           currentGame?.status === 'PLAYING' ? 'Game in Progress' :
+                           'Not Available'}
                         </Button>
                       )}
                     </div>

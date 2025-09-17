@@ -73,12 +73,70 @@ export async function POST(
       )
     }
 
-    // Check if all players have selected songs
-    if (game.selectedSongs.length !== game.participants.length) {
-      return NextResponse.json(
-        { error: 'Not all players have selected songs' },
-        { status: 400 }
-      )
+    // Check if this is a playlist game or individual selection game
+    if (game.playlistId) {
+      // For playlist games, we need to get songs from the playlist
+      const playlist = await prisma.playlist.findUnique({
+        where: { id: game.playlistId },
+        include: {
+          songs: {
+            include: {
+              song: true
+            },
+            orderBy: { position: 'asc' }
+          }
+        }
+      })
+
+      if (!playlist || playlist.songs.length === 0) {
+        return NextResponse.json(
+          { error: 'Playlist not found or has no songs' },
+          { status: 400 }
+        )
+      }
+
+      // Use first song from playlist as the current song
+      const firstSong = playlist.songs[0].song
+      
+      // Update game status to PLAYING
+      await prisma.game.update({
+        where: { id: gameId },
+        data: {
+          status: GameStatus.PLAYING,
+          startedAt: new Date(),
+          currentSongIndex: 0,
+          currentSongId: firstSong.id
+        }
+      })
+
+      // Prepare game state for playlist mode
+      const gameState = {
+        currentSongIndex: 0,
+        currentSong: {
+          id: firstSong.id,
+          title: firstSong.title,
+          artist: firstSong.artist,
+          album: firstSong.album,
+          previewUrl: firstSong.previewUrl,
+          imageUrl: firstSong.imageUrl,
+          selectedBy: 'playlist'
+        },
+        timeRemaining: 30,
+        isPlaying: false,
+        guesses: [],
+        roundScores: {},
+        totalSongs: playlist.songs.length
+      }
+
+      return NextResponse.json({ gameState })
+    } else {
+      // For individual selection games, check if all players have selected songs
+      if (game.selectedSongs.length !== game.participants.length) {
+        return NextResponse.json(
+          { error: 'Not all players have selected songs' },
+          { status: 400 }
+        )
+      }
     }
 
     // Update game status to PLAYING

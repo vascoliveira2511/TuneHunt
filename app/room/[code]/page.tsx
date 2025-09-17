@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { Users, Crown, Copy, Settings, Trash2, LogOut } from "lucide-react"
+import { Users, Crown, Copy, Settings, Trash2, LogOut, Play } from "lucide-react"
 import TrackSelection from "@/components/Game/TrackSelection"
 import GamePlay from "@/components/Game/GamePlay"
 
@@ -79,6 +79,13 @@ export default function RoomPage() {
     }
 
     fetchRoom()
+    
+    // Set up polling to refresh room data every 5 seconds
+    const pollInterval = setInterval(fetchRoom, 5000)
+    
+    return () => {
+      clearInterval(pollInterval)
+    }
   }, [roomCode])
 
   // Initialize settings when room data is loaded
@@ -422,6 +429,11 @@ export default function RoomPage() {
                   <span className="text-sm">
                     {participants.length}/{room.maxPlayers} players
                   </span>
+                  {/* Debug info - remove later */}
+                  <span className="text-xs bg-red-100 px-1 rounded">
+                    Game: {currentGame?.id ? 'exists' : 'missing'}, 
+                    Participants: {participants.length}
+                  </span>
                 </div>
               </div>
 
@@ -431,9 +443,9 @@ export default function RoomPage() {
                   <p className="text-sm text-muted-foreground">
                     Share the room code <strong>{roomCode}</strong> with your friends to get started!
                   </p>
-                  {isHost && participants.length >= 2 && (
-                    <Button className="mt-4">
-                      Start Game
+                  {isHost && participants.length >= 1 && (
+                    <Button className="mt-4" onClick={handleStartGame}>
+                      {participants.length === 1 ? 'Waiting for more players...' : 'Start Game'}
                     </Button>
                   )}
                 </div>
@@ -485,6 +497,31 @@ export default function RoomPage() {
           </Card>
         </div>
       </div>
+
+      {/* Waiting for host to start (playlist mode) */}
+      {gameStatus === 'WAITING' && gameId && (
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ready to Start</CardTitle>
+              <CardDescription>
+                {isHost 
+                  ? "All players have joined. Start the game when ready!"
+                  : "Waiting for the host to start the game..."
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isHost && (
+                <Button onClick={handleStartGame} size="lg">
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Game
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Track Selection for all players when game is in SELECTING status */}
       {gameStatus === 'SELECTING' && gameId && (
