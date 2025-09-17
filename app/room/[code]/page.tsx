@@ -7,7 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Users, Crown, Copy, Settings } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
+import { Users, Crown, Copy, Settings, Trash2, LogOut } from "lucide-react"
 import TrackSelection from "@/components/Game/TrackSelection"
 import GamePlay from "@/components/Game/GamePlay"
 
@@ -45,6 +49,12 @@ export default function RoomPage() {
   const [room, setRoom] = useState<Room | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [roomName, setRoomName] = useState("")
+  const [maxPlayers, setMaxPlayers] = useState([8])
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false)
+  const [isLeavingRoom, setIsLeavingRoom] = useState(false)
 
   const roomCode = params.code as string
 
@@ -71,12 +81,127 @@ export default function RoomPage() {
     fetchRoom()
   }, [roomCode])
 
+  // Initialize settings when room data is loaded
+  useEffect(() => {
+    if (room) {
+      setRoomName(room.name || "")
+      setMaxPlayers([room.maxPlayers])
+    }
+  }, [room])
+
+  // Handle leaving room when page unloads
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      if (session?.user?.id && roomCode) {
+        try {
+          // Use sendBeacon for reliable cleanup when page unloads
+          const data = JSON.stringify({});
+          navigator.sendBeacon(`/api/rooms/${roomCode}/leave`, data);
+        } catch (error) {
+          console.error('Failed to leave room on page unload:', error);
+        }
+      }
+    };
+
+    const handleUnload = () => handleBeforeUnload();
+    
+    window.addEventListener('beforeunload', handleUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      // Also cleanup when component unmounts
+      handleBeforeUnload();
+    };
+  }, [session?.user?.id, roomCode])
+
   const copyRoomCode = async () => {
     try {
       await navigator.clipboard.writeText(roomCode)
       // Could add a toast notification here
     } catch (error) {
       console.error('Failed to copy room code:', error)
+    }
+  }
+
+  const handleUpdateSettings = async () => {
+    if (!room) return
+    
+    setIsUpdatingSettings(true)
+    try {
+      const response = await fetch(`/api/rooms/${roomCode}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: roomName.trim() || undefined,
+          maxPlayers: maxPlayers[0]
+        }),
+      })
+
+      if (response.ok) {
+        const updatedRoom = await response.json()
+        setRoom(updatedRoom)
+        setSettingsOpen(false)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to update room settings')
+      }
+    } catch (error) {
+      console.error('Failed to update room settings:', error)
+      alert('Failed to update room settings')
+    } finally {
+      setIsUpdatingSettings(false)
+    }
+  }
+
+  const handleDeleteRoom = async () => {
+    if (!room || !confirm('Are you sure you want to delete this room? This action cannot be undone.')) return
+    
+    setIsDeletingRoom(true)
+    try {
+      const response = await fetch(`/api/rooms/${roomCode}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        router.push('/rooms')
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to delete room')
+      }
+    } catch (error) {
+      console.error('Failed to delete room:', error)
+      alert('Failed to delete room')
+    } finally {
+      setIsDeletingRoom(false)
+    }
+  }
+
+  const handleLeaveRoom = async () => {
+    if (!room) return
+    
+    setIsLeavingRoom(true)
+    try {
+      const response = await fetch(`/api/rooms/${roomCode}/leave`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        router.push('/rooms')
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to leave room')
+      }
+    } catch (error) {
+      console.error('Failed to leave room:', error)
+      alert('Failed to leave room')
+    } finally {
+      setIsLeavingRoom(false)
     }
   }
 
@@ -184,9 +309,101 @@ export default function RoomPage() {
                   </CardDescription>
                 </div>
                 {isHost && (
-                  <Button variant="outline" size="sm">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Settings
+                  <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Settings
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Room Settings</DialogTitle>
+                        <DialogDescription>
+                          Manage your room settings and preferences.
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-6 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="roomName">Room Name</Label>
+                          <Input
+                            id="roomName"
+                            placeholder="Enter room name..."
+                            value={roomName}
+                            onChange={(e) => setRoomName(e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <Label>Maximum Players: {maxPlayers[0]}</Label>
+                          <Slider
+                            value={maxPlayers}
+                            onValueChange={setMaxPlayers}
+                            min={2}
+                            max={16}
+                            step={1}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>2 players</span>
+                            <span>16 players</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col gap-3">
+                        <div className="flex justify-end gap-3">
+                          <Button
+                            variant="outline"
+                            onClick={() => setSettingsOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleUpdateSettings}
+                            disabled={isUpdatingSettings}
+                          >
+                            {isUpdatingSettings ? 'Updating...' : 'Save Changes'}
+                          </Button>
+                        </div>
+                        
+                        <div className="border-t pt-3 space-y-3">
+                          <Button
+                            variant="outline"
+                            onClick={handleLeaveRoom}
+                            disabled={isLeavingRoom}
+                            className="w-full"
+                          >
+                            <LogOut className="h-4 w-4 mr-2" />
+                            {isLeavingRoom ? 'Leaving...' : 'Leave Room'}
+                          </Button>
+                          
+                          {isHost && (
+                            <Button
+                              variant="destructive"
+                              onClick={handleDeleteRoom}
+                              disabled={isDeletingRoom}
+                              className="w-full"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              {isDeletingRoom ? 'Deleting...' : 'Delete Room'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+                {!isHost && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLeaveRoom}
+                    disabled={isLeavingRoom}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    {isLeavingRoom ? 'Leaving...' : 'Leave Room'}
                   </Button>
                 )}
               </div>

@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Users, Plus, ArrowLeft, Music, Star } from "lucide-react"
 import Link from "next/link"
@@ -111,24 +110,7 @@ export default function CreateRoomPage() {
 
       if (response.ok) {
         const room = await response.json()
-        
-        // Auto-join the room as host
-        const joinResponse = await fetch(`/api/rooms/${room.code}/join`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            displayName: session.user?.name || 'Host'
-          }),
-        })
-
-        if (joinResponse.ok) {
-          router.push(`/room/${room.code}`)
-        } else {
-          console.error('Failed to join created room')
-          router.push(`/room/${room.code}`)
-        }
+        router.push(`/room/${room.code}`)
       } else {
         const error = await response.json()
         alert(error.error || 'Failed to create room')

@@ -115,7 +115,7 @@ export default function PlaylistDetailPage() {
     router.push(`/create-room?playlist=${playlistId}`)
   }
 
-  const isOwner = session?.user && playlist?.createdBy === (session.user as any).id
+  const isOwner = session?.user && playlist?.createdBy === (session.user as { id: string }).id
 
   if (loading) {
     return (

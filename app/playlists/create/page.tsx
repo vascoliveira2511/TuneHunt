@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Music, Plus, ArrowLeft, Search, Play, Pause, X, Save } from "lucide-react"
+import { Music, ArrowLeft, Search, Play, Pause, X, Save } from "lucide-react"
 import Link from "next/link"
 import MusicSearch from "@/components/Game/MusicSearch"
 import type { SpotifyTrack } from "@/lib/spotify"
@@ -23,7 +22,6 @@ export default function CreatePlaylistPage() {
   const [selectedTracks, setSelectedTracks] = useState<SpotifyTrack[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [playingTrack, setPlayingTrack] = useState<string | null>(null)
-  const [showSearch, setShowSearch] = useState(false)
 
   const handleAddTrack = (track: SpotifyTrack) => {
     if (!selectedTracks.find(t => t.id === track.id)) {

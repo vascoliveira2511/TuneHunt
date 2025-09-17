@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { PlaylistStatus } from "@prisma/client"
 import type { Session } from "next-auth"
 
 interface Params {
@@ -50,7 +49,7 @@ export async function GET(
 
     // Check if playlist is accessible
     const session = await getServerSession(authOptions) as Session | null
-    const isOwner = session?.user && 'id' in session.user && playlist.createdBy === (session.user as any).id
+    const isOwner = session?.user && 'id' in session.user && playlist.createdBy === (session.user as { id: string }).id
 
     if (!playlist.isPublished && !playlist.isOfficial && !isOwner) {
       return NextResponse.json(

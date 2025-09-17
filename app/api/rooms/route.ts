@@ -159,13 +159,19 @@ export async function POST(request: NextRequest) {
         maxPlayers,
         settings: JSON.stringify(settings),
         status: RoomStatus.WAITING,
-        // Create initial game with playlist if provided
-        games: playlistId ? {
+        // Always create initial game with host as participant
+        games: {
           create: {
             status: 'SELECTING',
-            playlistId: playlistId
+            playlistId: playlistId || undefined,
+            participants: {
+              create: {
+                userId: session.user.id,
+                displayName: session.user.name || 'Host'
+              }
+            }
           }
-        } : undefined
+        }
       },
       include: {
         host: {
@@ -177,6 +183,17 @@ export async function POST(request: NextRequest) {
         },
         games: {
           include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true
+                  }
+                }
+              }
+            },
             playlist: {
               select: {
                 id: true,

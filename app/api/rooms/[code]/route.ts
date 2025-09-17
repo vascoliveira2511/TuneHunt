@@ -116,6 +116,25 @@ export async function PUT(
             name: true,
             image: true,
           }
+        },
+        games: {
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true,
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 1
         }
       }
     })

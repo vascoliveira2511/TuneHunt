@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,10 +40,19 @@ interface Room {
 export default function RoomsPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [joinCode, setJoinCode] = useState("")
+
+  // Initialize search query from URL params
+  useEffect(() => {
+    const urlSearch = searchParams.get('search')
+    if (urlSearch) {
+      setSearchQuery(urlSearch)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const fetchRooms = async () => {
