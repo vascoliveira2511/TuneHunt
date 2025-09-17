@@ -12,18 +12,18 @@ import type { SpotifyTrack } from "@/lib/spotify"
 
 interface PlaylistManagerProps {
   isHost: boolean
+  currentUserId: string
   onStartGame?: () => void
 }
 
-export default function PlaylistManager({ isHost, onStartGame }: PlaylistManagerProps) {
-  const [selectedTracks, setSelectedTracks] = useState<SpotifyTrack[]>([])
+export default function PlaylistManager({ isHost, currentUserId, onStartGame }: PlaylistManagerProps) {
+  const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | null>(null)
   const [playingTrack, setPlayingTrack] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const handleTrackSelect = (track: SpotifyTrack) => {
-    if (!selectedTracks.some(selected => selected.id === track.id)) {
-      setSelectedTracks(prev => [...prev, track])
-    }
+    setSelectedTrack(track)
+    // TODO: Save to database
   }
 
   const handleRemoveTrack = (trackId: string) => {

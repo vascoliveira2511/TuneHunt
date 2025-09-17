@@ -12,9 +12,10 @@ import type { SpotifyTrack } from "@/lib/spotify"
 interface MusicSearchProps {
   onTrackSelect: (track: SpotifyTrack) => void
   selectedTracks?: SpotifyTrack[]
+  isLoading?: boolean
 }
 
-export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: MusicSearchProps) {
+export default function MusicSearch({ onTrackSelect, selectedTracks = [], isLoading: externalLoading }: MusicSearchProps) {
   const [query, setQuery] = useState("")
   const [tracks, setTracks] = useState<SpotifyTrack[]>([])
   const [loading, setLoading] = useState(false)
