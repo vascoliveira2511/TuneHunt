@@ -1,0 +1,121 @@
+import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { GameStatus } from "@prisma/client"
+import type { Session } from "next-auth"
+
+interface Params {
+  gameId: string
+}
+
+// POST /api/games/[gameId]/start - Start the game and return first song
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  try {
+    const session = await getServerSession(authOptions) as Session | null
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    const { gameId } = await params
+
+    // Get the game with selected songs
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: {
+        selectedSongs: {
+          include: {
+            song: true,
+            selector: {
+              select: {
+                id: true,
+                name: true,
+                image: true
+              }
+            }
+          },
+          orderBy: { createdAt: 'asc' }
+        },
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                image: true
+              }
+            }
+          }
+        },
+        room: true
+      }
+    })
+
+    if (!game) {
+      return NextResponse.json(
+        { error: 'Game not found' },
+        { status: 404 }
+      )
+    }
+
+    // Check if user is host
+    const isHost = session.user.id === game.room.hostId
+    if (!isHost) {
+      return NextResponse.json(
+        { error: 'Only the host can start the game' },
+        { status: 403 }
+      )
+    }
+
+    // Check if all players have selected songs
+    if (game.selectedSongs.length !== game.participants.length) {
+      return NextResponse.json(
+        { error: 'Not all players have selected songs' },
+        { status: 400 }
+      )
+    }
+
+    // Update game status to PLAYING
+    await prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: GameStatus.PLAYING,
+        startedAt: new Date(),
+        currentSongIndex: 0,
+        currentSongId: game.selectedSongs[0].songId
+      }
+    })
+
+    // Prepare game state
+    const gameState = {
+      currentSongIndex: 0,
+      currentSong: {
+        id: game.selectedSongs[0].song.id,
+        title: game.selectedSongs[0].song.title,
+        artist: game.selectedSongs[0].song.artist,
+        album: game.selectedSongs[0].song.album,
+        previewUrl: game.selectedSongs[0].song.previewUrl,
+        imageUrl: game.selectedSongs[0].song.imageUrl,
+        selectedBy: game.selectedSongs[0].selectedBy || ''
+      },
+      timeRemaining: 30,
+      isPlaying: false,
+      guesses: [],
+      roundScores: {}
+    }
+
+    return NextResponse.json({ gameState })
+  } catch (error) {
+    console.error('Error starting game:', error)
+    return NextResponse.json(
+      { error: 'Failed to start game' },
+      { status: 500 }
+    )
+  }
+}

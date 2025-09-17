@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Users, Crown, Copy, Settings } from "lucide-react"
 import TrackSelection from "@/components/Game/TrackSelection"
+import GamePlay from "@/components/Game/GamePlay"
 
 interface Room {
   id: string
@@ -111,8 +112,51 @@ export default function RoomPage() {
 
   const currentGame = room.games[0]
   const participants = currentGame?.participants || []
-  const isHost = session?.user && 'id' in session.user ? session.user.id === room.host.id : false
+  const isHost = session?.user && 'id' in session.user ? (session.user as any).id === room.host.id : false
   const gameId = currentGame?.id
+  const gameStatus = currentGame?.status
+
+  const handleStartGame = async () => {
+    if (!gameId) return
+    
+    try {
+      const response = await fetch(`/api/games/${gameId}/start`, {
+        method: 'POST'
+      })
+      
+      if (response.ok) {
+        // Refresh room data to get updated game status
+        const roomResponse = await fetch(`/api/rooms/${roomCode}`)
+        if (roomResponse.ok) {
+          const roomData = await roomResponse.json()
+          setRoom(roomData)
+        }
+      } else {
+        const error = await response.json()
+        console.error('Failed to start game:', error.error)
+        alert(error.error || 'Failed to start game')
+      }
+    } catch (error) {
+      console.error('Failed to start game:', error)
+      alert('Failed to start game')
+    }
+  }
+
+  const handleGameEnd = () => {
+    // Refresh room data when game ends
+    const fetchRoom = async () => {
+      try {
+        const response = await fetch(`/api/rooms/${roomCode}`)
+        if (response.ok) {
+          const roomData = await response.json()
+          setRoom(roomData)
+        }
+      } catch (error) {
+        console.error('Error fetching room:', error)
+      }
+    }
+    fetchRoom()
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -226,20 +270,87 @@ export default function RoomPage() {
         </div>
       </div>
 
-      {/* Track Selection for all players when room is waiting */}
-      {room.status === 'WAITING' && gameId && (
+      {/* Track Selection for all players when game is in SELECTING status */}
+      {gameStatus === 'SELECTING' && gameId && (
         <div className="mt-8">
           <TrackSelection 
             roomCode={roomCode}
             gameId={gameId}
-            currentUserId={session?.user?.id || ''}
+            currentUserId={(session?.user as any)?.id || ''}
             isHost={isHost}
             participants={participants}
-            onStartGame={() => {
-              // TODO: Implement start game logic
-              console.log('Starting game...')
-            }}
+            onStartGame={handleStartGame}
           />
+        </div>
+      )}
+
+      {/* Game Play when game is in PLAYING status */}
+      {gameStatus === 'PLAYING' && gameId && (
+        <div className="mt-8">
+          <GamePlay 
+            roomCode={roomCode}
+            gameId={gameId}
+            currentUserId={(session?.user as any)?.id || ''}
+            isHost={isHost}
+            participants={participants}
+            onGameEnd={handleGameEnd}
+          />
+        </div>
+      )}
+
+      {/* Game Results when game is FINISHED */}
+      {gameStatus === 'FINISHED' && (
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Game Complete!</CardTitle>
+              <CardDescription>
+                Here are the final results
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {participants
+                  .sort((a, b) => b.score - a.score)
+                  .map((participant, index) => (
+                    <div key={participant.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                          index === 0 ? 'bg-yellow-500 text-white' : 
+                          index === 1 ? 'bg-gray-400 text-white' : 
+                          index === 2 ? 'bg-amber-600 text-white' : 
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={participant.user?.image} />
+                          <AvatarFallback>
+                            {participant.displayName?.[0] || participant.user?.name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">
+                          {participant.displayName || participant.user?.name}
+                        </span>
+                      </div>
+                      <span className="font-bold text-lg">
+                        {participant.score} points
+                      </span>
+                    </div>
+                  ))}
+              </div>
+              {isHost && (
+                <div className="mt-6 pt-6 border-t">
+                  <Button onClick={() => {
+                    // TODO: Implement new game logic
+                    console.log('Starting new game...')
+                  }}>
+                    Start New Game
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

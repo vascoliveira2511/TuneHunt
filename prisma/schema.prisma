@@ -208,6 +208,7 @@ model GameParticipant {
   game         Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
   user         User?    @relation(fields: [userId], references: [id])
 
+  @@unique([gameId, userId])
   @@map("game_participants")
 }
 
