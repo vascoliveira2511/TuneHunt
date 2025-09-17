@@ -112,7 +112,7 @@ export default function RoomPage() {
 
   const currentGame = room.games[0]
   const participants = currentGame?.participants || []
-  const isHost = session?.user && 'id' in session.user ? (session.user as any).id === room.host.id : false
+  const isHost = session?.user && 'id' in session.user ? (session.user as { id: string }).id === room.host.id : false
   const gameId = currentGame?.id
   const gameStatus = currentGame?.status
 
@@ -274,9 +274,8 @@ export default function RoomPage() {
       {gameStatus === 'SELECTING' && gameId && (
         <div className="mt-8">
           <TrackSelection 
-            roomCode={roomCode}
             gameId={gameId}
-            currentUserId={(session?.user as any)?.id || ''}
+            currentUserId={(session?.user as { id: string })?.id || ''}
             isHost={isHost}
             participants={participants}
             onStartGame={handleStartGame}
@@ -288,9 +287,8 @@ export default function RoomPage() {
       {gameStatus === 'PLAYING' && gameId && (
         <div className="mt-8">
           <GamePlay 
-            roomCode={roomCode}
             gameId={gameId}
-            currentUserId={(session?.user as any)?.id || ''}
+            currentUserId={(session?.user as { id: string })?.id || ''}
             isHost={isHost}
             participants={participants}
             onGameEnd={handleGameEnd}

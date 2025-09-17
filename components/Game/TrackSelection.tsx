@@ -11,7 +11,6 @@ import MusicSearch from "./MusicSearch"
 import type { SpotifyTrack } from "@/lib/spotify"
 
 interface TrackSelectionProps {
-  roomCode: string
   gameId: string
   currentUserId: string
   isHost: boolean
@@ -27,12 +26,24 @@ interface TrackSelectionProps {
   onStartGame?: () => void
 }
 
-export default function TrackSelection({ roomCode, gameId, currentUserId, isHost, participants, onStartGame }: TrackSelectionProps) {
+export default function TrackSelection({ gameId, currentUserId, isHost, participants, onStartGame }: TrackSelectionProps) {
   const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | null>(null)
   const [playingTrack, setPlayingTrack] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [allSelections, setAllSelections] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [allSelections, setAllSelections] = useState<Array<{
+    id: string
+    selectedBy: string
+    song: {
+      spotifyId: string
+      title: string
+      artist: string
+      album?: string
+      previewUrl?: string
+      imageUrl?: string
+      durationMs?: number
+    }
+  }>>([])
+  const [, setIsLoading] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Load existing selections on mount
@@ -45,7 +56,7 @@ export default function TrackSelection({ roomCode, gameId, currentUserId, isHost
           setAllSelections(data.selections)
           
           // Find current user's selection
-          const userSelection = data.selections.find((s: any) => s.selectedBy === currentUserId)
+          const userSelection = data.selections.find((s: { selectedBy: string }) => s.selectedBy === currentUserId)
           if (userSelection) {
             // Convert from database format back to Spotify format
             const spotifyTrack: SpotifyTrack = {
@@ -66,7 +77,7 @@ export default function TrackSelection({ roomCode, gameId, currentUserId, isHost
       } catch (error) {
         console.error('Failed to load selections:', error)
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
@@ -246,7 +257,7 @@ export default function TrackSelection({ roomCode, gameId, currentUserId, isHost
             ) : (
               <div className="text-center py-4 text-muted-foreground">
                 <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>You haven't selected a track yet</p>
+                <p>You haven&apos;t selected a track yet</p>
                 <p className="text-sm">Search below to choose your track</p>
               </div>
             )}

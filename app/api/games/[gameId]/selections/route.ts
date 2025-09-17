@@ -99,7 +99,7 @@ export async function POST(
         data: {
           spotifyId: spotifyTrack.id,
           title: spotifyTrack.name,
-          artist: spotifyTrack.artists.map((a: any) => a.name).join(', '),
+          artist: spotifyTrack.artists.map((a: { name: string }) => a.name).join(', '),
           album: spotifyTrack.album.name,
           previewUrl: spotifyTrack.preview_url,
           imageUrl: spotifyTrack.album.images[0]?.url,

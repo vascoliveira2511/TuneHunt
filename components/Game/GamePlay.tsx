@@ -10,7 +10,6 @@ import { Progress } from "@/components/ui/progress"
 import { Play, Pause, SkipForward, Trophy, Clock, Music, Send } from "lucide-react"
 
 interface GamePlayProps {
-  roomCode: string
   gameId: string
   currentUserId: string
   isHost: boolean
@@ -52,7 +51,7 @@ interface GameState {
   roundScores: Record<string, number>
 }
 
-export default function GamePlay({ roomCode, gameId, currentUserId, isHost, participants, onGameEnd }: GamePlayProps) {
+export default function GamePlay({ gameId, currentUserId, isHost, participants, onGameEnd }: GamePlayProps) {
   const [gameState, setGameState] = useState<GameState | null>(null)
   const [loading, setLoading] = useState(true)
   const [titleGuess, setTitleGuess] = useState("")
@@ -67,37 +66,43 @@ export default function GamePlay({ roomCode, gameId, currentUserId, isHost, part
   const POINTS_TITLE = 100
   const POINTS_ARTIST = 50
 
-  // Load game state and start first round
-  useEffect(() => {
-    const initializeGame = async () => {
-      try {
-        const response = await fetch(`/api/games/${gameId}/start`, {
-          method: 'POST'
-        })
+  const nextSong = async () => {
+    if (!isHost) return
+
+    try {
+      const response = await fetch(`/api/games/${gameId}/next`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
         
-        if (response.ok) {
-          const data = await response.json()
+        if (data.gameComplete) {
+          onGameEnd?.()
+        } else {
           setGameState(data.gameState)
           startRound(data.gameState)
         }
-      } catch (error) {
-        console.error('Failed to initialize game:', error)
-      } finally {
-        setLoading(false)
       }
+    } catch (error) {
+      console.error('Failed to advance to next song:', error)
+    }
+  }
+
+  const endRound = async () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+    
+    if (audioRef.current) {
+      audioRef.current.pause()
     }
 
-    initializeGame()
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
-      if (audioRef.current) {
-        audioRef.current.pause()
-      }
-    }
-  }, [gameId])
+    // Show results for a moment, then move to next song
+    setTimeout(() => {
+      nextSong()
+    }, 3000)
+  }
 
   const startRound = (state: GameState) => {
     // Reset round state
@@ -130,6 +135,38 @@ export default function GamePlay({ roomCode, gameId, currentUserId, isHost, part
       playAudio(state.currentSong.previewUrl)
     }
   }
+
+  // Load game state and start first round
+  useEffect(() => {
+    const initializeGame = async () => {
+      try {
+        const response = await fetch(`/api/games/${gameId}/start`, {
+          method: 'POST'
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          setGameState(data.gameState)
+          startRound(data.gameState)
+        }
+      } catch (error) {
+        console.error('Failed to initialize game:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initializeGame()
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+    }
+  }, [gameId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const playAudio = (url: string) => {
     if (audioRef.current) {
@@ -215,43 +252,6 @@ export default function GamePlay({ roomCode, gameId, currentUserId, isHost, part
     }
   }
 
-  const endRound = async () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-    }
-    
-    if (audioRef.current) {
-      audioRef.current.pause()
-    }
-
-    // Show results for a moment, then move to next song
-    setTimeout(() => {
-      nextSong()
-    }, 3000)
-  }
-
-  const nextSong = async () => {
-    if (!isHost) return
-
-    try {
-      const response = await fetch(`/api/games/${gameId}/next`, {
-        method: 'POST'
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        
-        if (data.gameComplete) {
-          onGameEnd?.()
-        } else {
-          setGameState(data.gameState)
-          startRound(data.gameState)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to advance to next song:', error)
-    }
-  }
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60)
@@ -304,7 +304,7 @@ export default function GamePlay({ roomCode, gameId, currentUserId, isHost, part
                 </span>
               </div>
               {gameState.timeRemaining === 0 && (
-                <Badge variant="destructive">Time's up!</Badge>
+                <Badge variant="destructive">Time&apos;s up!</Badge>
               )}
             </div>
           </div>

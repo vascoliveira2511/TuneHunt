@@ -15,7 +15,7 @@ interface MusicSearchProps {
   isLoading?: boolean
 }
 
-export default function MusicSearch({ onTrackSelect, selectedTracks = [], isLoading: externalLoading }: MusicSearchProps) {
+export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: MusicSearchProps) {
   const [query, setQuery] = useState("")
   const [tracks, setTracks] = useState<SpotifyTrack[]>([])
   const [loading, setLoading] = useState(false)
