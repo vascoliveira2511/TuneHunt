@@ -16,14 +16,28 @@ function generateRoomCode(): string {
 }
 
 // GET /api/rooms - Get all active rooms
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const rooms = await prisma.room.findMany({
-      where: {
-        status: {
-          in: [RoomStatus.WAITING, RoomStatus.SELECTING, RoomStatus.PLAYING]
-        }
+    const { searchParams } = new URL(request.url)
+    const search = searchParams.get('search')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const offset = parseInt(searchParams.get('offset') || '0')
+
+    const where = {
+      status: {
+        in: [RoomStatus.WAITING, RoomStatus.SELECTING, RoomStatus.PLAYING]
       },
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' as const } },
+          { code: { contains: search, mode: 'insensitive' as const } },
+          { host: { name: { contains: search, mode: 'insensitive' as const } } }
+        ]
+      })
+    }
+
+    const rooms = await prisma.room.findMany({
+      where,
       include: {
         host: {
           select: {
@@ -32,24 +46,41 @@ export async function GET() {
             image: true,
           }
         },
-        _count: {
-          select: {
-            games: {
-              where: {
-                participants: {
-                  some: {}
+        games: {
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true
+                  }
                 }
               }
             }
-          }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 1
         }
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy: [
+        { status: 'asc' }, // WAITING first, then SELECTING, then PLAYING
+        { createdAt: 'desc' }
+      ],
+      take: limit,
+      skip: offset
     })
 
-    return NextResponse.json(rooms)
+    const total = await prisma.room.count({ where })
+
+    return NextResponse.json({
+      rooms,
+      total,
+      hasMore: offset + limit < total
+    })
   } catch (error) {
     console.error('Error fetching rooms:', error)
     return NextResponse.json(
