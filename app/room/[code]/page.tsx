@@ -250,18 +250,29 @@ export default function RoomPage() {
   const isPlaylistGame = currentGame?.playlistId != null
 
   const handleStartGame = async () => {
-    if (!gameId) return
+    console.log('handleStartGame called, gameId:', gameId)
+    if (!gameId) {
+      console.error('No gameId available')
+      return
+    }
     
     try {
+      console.log('Calling start game API for gameId:', gameId)
       const response = await fetch(`/api/games/${gameId}/start`, {
         method: 'POST'
       })
       
+      console.log('Start game response status:', response.status)
+      
       if (response.ok) {
+        const data = await response.json()
+        console.log('Start game success:', data)
+        
         // Refresh room data to get updated game status
         const roomResponse = await fetch(`/api/rooms/${roomCode}`)
         if (roomResponse.ok) {
           const roomData = await roomResponse.json()
+          console.log('Room data after start:', roomData)
           setRoom(roomData)
         }
       } else {

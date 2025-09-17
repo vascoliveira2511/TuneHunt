@@ -136,27 +136,29 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
     }
   }
 
-  // Load game state and start first round
+  // Load current game state
   useEffect(() => {
-    const initializeGame = async () => {
+    const loadGameState = async () => {
       try {
-        const response = await fetch(`/api/games/${gameId}/start`, {
-          method: 'POST'
-        })
+        console.log('🎮 GamePlay: Loading game state for gameId:', gameId)
+        const response = await fetch(`/api/games/${gameId}/state`)
         
         if (response.ok) {
           const data = await response.json()
+          console.log('🎮 GamePlay: Loaded game state:', data)
           setGameState(data.gameState)
           startRound(data.gameState)
+        } else {
+          console.error('Failed to load game state:', response.status)
         }
       } catch (error) {
-        console.error('Failed to initialize game:', error)
+        console.error('Failed to load game state:', error)
       } finally {
         setLoading(false)
       }
     }
 
-    initializeGame()
+    loadGameState()
 
     return () => {
       if (timerRef.current) {
@@ -169,6 +171,8 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   }, [gameId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const playAudio = (url: string) => {
+    console.log('🎵 playAudio called with URL:', url)
+    
     if (audioRef.current) {
       audioRef.current.pause()
     }
@@ -177,10 +181,19 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
     audio.volume = 0.3
     audioRef.current = audio
 
-    audio.play().catch(console.error)
+    console.log('🔊 Attempting to play audio...')
+    audio.play()
+      .then(() => {
+        console.log('✅ Audio playing successfully')
+      })
+      .catch((error) => {
+        console.error('❌ Audio play failed:', error)
+      })
+    
     setGameState(prev => prev ? { ...prev, isPlaying: true } : prev)
 
     audio.onended = () => {
+      console.log('🔚 Audio ended')
       setGameState(prev => prev ? { ...prev, isPlaying: false } : prev)
     }
   }
