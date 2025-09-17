@@ -53,6 +53,8 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
         const response = await fetch(`/api/games/${gameId}/selections`)
         if (response.ok) {
           const data = await response.json()
+          console.log('Loaded selections:', data.selections)
+          console.log('Current user ID:', currentUserId)
           setAllSelections(data.selections)
           
           // Find current user's selection
@@ -287,6 +289,8 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
             <div className="grid gap-3">
               {participants.map((participant) => {
                 const hasSelected = allSelections.some(s => s.selectedBy === participant.user?.id)
+                console.log(`Participant ${participant.displayName}: user.id=${participant.user?.id}, hasSelected=${hasSelected}`)
+                console.log('All selections:', allSelections.map(s => ({ selectedBy: s.selectedBy, song: s.song.title })))
                 return (
                   <div key={participant.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-3">
