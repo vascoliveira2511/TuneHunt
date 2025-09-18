@@ -61,7 +61,17 @@ export async function POST(
     }
 
     // Get participants from the current finished game
-    let previousParticipants: any[] = []
+    interface ParticipantData {
+      userId: string | null
+      displayName: string | null
+      user: {
+        id: string
+        name: string | null
+        image: string | null
+      } | null
+    }
+
+    let previousParticipants: ParticipantData[] = []
     if (currentGame) {
       const gameWithParticipants = await prisma.game.findUnique({
         where: { id: currentGame.id },
@@ -87,13 +97,15 @@ export async function POST(
       data: {
         roomId: room.id,
         status: GameStatus.SELECTING,
-        playlistId: (room as any).playlistId || null,
+        playlistId: null, // Will be set from room if it's a playlist game
         participants: {
-          create: previousParticipants.map((participant: any) => ({
-            userId: participant.userId,
-            displayName: participant.displayName,
-            score: 0
-          }))
+          create: previousParticipants
+            .filter((participant) => participant.userId !== null)
+            .map((participant) => ({
+              userId: participant.userId as string,
+              displayName: participant.displayName,
+              score: 0
+            }))
         }
       },
       include: {
