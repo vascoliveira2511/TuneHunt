@@ -14,6 +14,7 @@ import { Slider } from "@/components/ui/slider"
 import { Users, Crown, Copy, Settings, Trash2, LogOut, Play } from "lucide-react"
 import TrackSelection from "@/components/Game/TrackSelection"
 import GamePlay from "@/components/Game/GamePlay"
+import GameSongsSummary from "@/components/Game/GameSongsSummary"
 
 interface Room {
   id: string
@@ -302,6 +303,30 @@ export default function RoomPage() {
     fetchRoom()
   }
 
+  const handleStartNewGame = async () => {
+    try {
+      // Create a new game for the room
+      const response = await fetch(`/api/rooms/${roomCode}/new-game`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        // Refresh room data to show the new game
+        const roomResponse = await fetch(`/api/rooms/${roomCode}`)
+        if (roomResponse.ok) {
+          const roomData = await roomResponse.json()
+          setRoom(roomData)
+        }
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to start new game')
+      }
+    } catch (error) {
+      console.error('Failed to start new game:', error)
+      alert('Failed to start new game')
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid lg:grid-cols-3 gap-6">
@@ -564,12 +589,13 @@ export default function RoomPage() {
 
       {/* Game Results when game is FINISHED */}
       {gameStatus === 'FINISHED' && (
-        <div className="mt-8">
+        <div className="mt-8 space-y-6">
+          {/* Final Scores */}
           <Card>
             <CardHeader>
-              <CardTitle>Game Complete!</CardTitle>
+              <CardTitle>🏆 Final Results</CardTitle>
               <CardDescription>
-                Here are the final results
+                Congratulations to all players!
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -580,9 +606,9 @@ export default function RoomPage() {
                     <div key={participant.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                          index === 0 ? 'bg-yellow-500 text-white' : 
-                          index === 1 ? 'bg-gray-400 text-white' : 
-                          index === 2 ? 'bg-amber-600 text-white' : 
+                          index === 0 ? 'bg-yellow-500 text-white' :
+                          index === 1 ? 'bg-gray-400 text-white' :
+                          index === 2 ? 'bg-amber-600 text-white' :
                           'bg-muted text-muted-foreground'
                         }`}>
                           {index + 1}
@@ -605,16 +631,16 @@ export default function RoomPage() {
               </div>
               {isHost && (
                 <div className="mt-6 pt-6 border-t">
-                  <Button onClick={() => {
-                    // TODO: Implement new game logic
-                    console.log('Starting new game...')
-                  }}>
+                  <Button onClick={handleStartNewGame}>
                     Start New Game
                   </Button>
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* Songs Played */}
+          <GameSongsSummary gameId={gameId} />
         </div>
       )}
     </div>

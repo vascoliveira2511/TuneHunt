@@ -309,7 +309,7 @@ export default function CreatePlaylistPage() {
             <CardHeader>
               <CardTitle>Add Tracks</CardTitle>
               <CardDescription>
-                Search Spotify for tracks to add to your playlist
+                Search for tracks to add to your playlist
               </CardDescription>
             </CardHeader>
             <CardContent>

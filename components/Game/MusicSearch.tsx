@@ -128,7 +128,7 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
         <div className="relative flex-1">
           <Input
             type="text"
-            placeholder="Search for songs, artists, or albums..."
+            placeholder="Search for songs, artists, or albums... 🎵"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -232,13 +232,7 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
 
         {tracks.length === 0 && query && !loading && (
           <div className="text-center py-8 text-muted-foreground">
-            No tracks found for &quot;{query}&quot;
-          </div>
-        )}
-
-        {tracks.length === 0 && !query && (
-          <div className="text-center py-8 text-muted-foreground">
-            Search for songs to add to your game
+            No tracks found for &quot;{query}&quot;. Try different keywords!
           </div>
         )}
       </div>
