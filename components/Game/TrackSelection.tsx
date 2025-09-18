@@ -229,7 +229,7 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  <Badge variant="secondary" className="bg-primary/10 text-primary">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Selected
                   </Badge>

@@ -582,7 +582,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                   key={`${guess.id}-${index}`}
                   className={`flex items-center justify-between p-3 rounded-lg transition-all duration-300 ${
                     guess.isCorrect
-                      ? 'bg-green-100 border border-green-200 dark:bg-green-900/20 dark:border-green-800'
+                      ? 'bg-primary/10 border border-primary/20 dark:bg-primary/10 dark:border-primary/30'
                       : 'bg-muted/50'
                   }`}
                 >
@@ -596,14 +596,14 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                     <Badge variant={guess.isCorrect ? "default" : "outline"} className="text-xs">
                       {guess.guessType === 'TITLE' ? 'Title' : 'Artist'}
                     </Badge>
-                    <span className={`text-sm ${guess.isCorrect ? 'font-semibold text-green-800 dark:text-green-200' : ''}`}>
+                    <span className={`text-sm ${guess.isCorrect ? 'font-semibold text-primary' : ''}`}>
                       {guess.guessText}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     {guess.isCorrect && (
                       <>
-                        <Badge variant="secondary" className="bg-green-200 text-green-800">
+                        <Badge variant="secondary" className="bg-primary/20 text-primary">
                           🎉 +{guess.pointsAwarded}
                         </Badge>
                       </>
@@ -716,7 +716,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                     }, [] as Array<{userId: string, userName: string, totalPoints: number, guesses: Array<{guessType: string, pointsAwarded: number}>}>)
                     .sort((a, b) => b.totalPoints - a.totalPoints)
                     .map((winner) => (
-                      <div key={winner.userId} className="flex items-center justify-between p-2 bg-green-100 rounded dark:bg-green-900/20">
+                      <div key={winner.userId} className="flex items-center justify-between p-2 bg-primary/10 rounded dark:bg-primary/10">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{winner.userName}</span>
                           <div className="text-xs text-muted-foreground">

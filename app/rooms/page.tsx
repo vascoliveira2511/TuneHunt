@@ -122,7 +122,7 @@ export default function RoomsPage() {
       case 'SELECTING':
         return 'bg-yellow-100 text-yellow-800'
       case 'PLAYING':
-        return 'bg-green-100 text-green-800'
+        return 'bg-primary/10 text-primary'
       case 'FINISHED':
         return 'bg-gray-100 text-gray-800'
       default:
