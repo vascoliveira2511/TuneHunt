@@ -141,8 +141,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       playAudio(state.currentSong.previewUrl)
     } else {
       console.log('❌ No preview URL available for current song')
-      // Show a message that no preview is available
-      // In a real game, you might skip to the next song or show the answer immediately
+      // TODO: Handle no-audio mode - could show lyrics, album art, or skip to answer
     }
   }
 

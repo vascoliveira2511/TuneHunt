@@ -17,7 +17,11 @@
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
       "Bash(openssl rand:*)",
-      "Bash(npm i:*)"
+      "Bash(npm i:*)",
+      "WebSearch",
+      "WebFetch(domain:developer.spotify.com)",
+      "WebFetch(domain:developers.deezer.com)",
+      "WebFetch(domain:api.deezer.com)"
     ],
     "deny": [],
     "ask": []
