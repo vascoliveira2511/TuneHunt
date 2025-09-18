@@ -67,8 +67,9 @@ export default function TrackSelection({ gameId, currentUserId, isHost, particip
               images: userSelection.song.imageUrl ? [{ url: userSelection.song.imageUrl, height: 300, width: 300 }] : []
             },
             preview_url: userSelection.song.previewUrl,
-            external_urls: { spotify: '' },
-            duration_ms: userSelection.song.durationMs || 0
+            external_urls: { deezer: '' },
+            duration_ms: userSelection.song.durationMs || 0,
+            source: 'deezer'
           }
           setSelectedTrack(spotifyTrack)
         }
