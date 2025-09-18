@@ -95,6 +95,7 @@ export async function POST(
     })
 
     if (!song) {
+      // Song doesn't exist, create it
       song = await prisma.song.create({
         data: {
           spotifyId: spotifyTrack.id,
@@ -102,6 +103,22 @@ export async function POST(
           artist: spotifyTrack.artists.map((a: { name: string }) => a.name).join(', '),
           album: spotifyTrack.album.name,
           previewUrl: spotifyTrack.preview_url,
+          imageUrl: spotifyTrack.album.images[0]?.url,
+          durationMs: spotifyTrack.duration_ms
+        }
+      })
+    } else if (!song.previewUrl && spotifyTrack.preview_url) {
+      // Song exists but missing preview URL - update it with fresh Spotify data
+      console.log(`🔄 Updating song "${song.title}" with preview URL: ${spotifyTrack.preview_url}`)
+      
+      song = await prisma.song.update({
+        where: { id: song.id },
+        data: {
+          previewUrl: spotifyTrack.preview_url,
+          // Also update other fields in case they've changed
+          title: spotifyTrack.name,
+          artist: spotifyTrack.artists.map((a: { name: string }) => a.name).join(', '),
+          album: spotifyTrack.album.name,
           imageUrl: spotifyTrack.album.images[0]?.url,
           durationMs: spotifyTrack.duration_ms
         }

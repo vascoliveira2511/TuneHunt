@@ -45,6 +45,7 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       if (response.ok) {
         const data = await response.json()
         console.log('✅ Response data:', data)
+        console.log('🎵 First track preview_url:', data.tracks[0]?.preview_url)
         setTracks(data.tracks || [])
       } else {
         const errorData = await response.text()

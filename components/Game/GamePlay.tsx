@@ -131,8 +131,18 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
     }, 1000)
 
     // Start audio if available
+    console.log('🎵 Checking for audio:', {
+      previewUrl: state.currentSong.previewUrl,
+      currentSong: state.currentSong
+    })
+    
     if (state.currentSong.previewUrl) {
+      console.log('🎵 Preview URL found, starting audio...')
       playAudio(state.currentSong.previewUrl)
+    } else {
+      console.log('❌ No preview URL available for current song')
+      // Show a message that no preview is available
+      // In a real game, you might skip to the next song or show the answer immediately
     }
   }
 
