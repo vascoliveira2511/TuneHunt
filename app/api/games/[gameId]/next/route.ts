@@ -141,7 +141,7 @@ export async function POST(
         album: song.album,
         previewUrl: song.previewUrl,
         imageUrl: song.imageUrl,
-        selectedBy: game.playlistId ? 'playlist' : ((nextSong as any).selectedBy || '')
+        selectedBy: game.playlistId ? 'playlist' : (nextSong as { selectedBy?: string }).selectedBy || ''
       },
       timeRemaining: 30,
       isPlaying: false,
