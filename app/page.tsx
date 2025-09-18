@@ -15,7 +15,7 @@ export default function Home() {
     <div className="container mx-auto px-4 py-8">
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-primary via-accent to-blue-500 bg-clip-text text-transparent">
+        <h1 className="text-4xl md:text-6xl font-bold mb-4 text-gradient">
           TuneHunt
         </h1>
         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -23,10 +23,10 @@ export default function Home() {
           and see who can guess the most songs!
         </p>
         <div className="flex gap-4 justify-center">
-          <Button size="lg" className="text-lg px-8" onClick={() => setCreateRoomOpen(true)}>
+          <Button size="lg" className="text-lg px-8 btn-premium" onClick={() => setCreateRoomOpen(true)}>
             Create Room
           </Button>
-          <Button variant="outline" size="lg" className="text-lg px-8" onClick={() => setJoinRoomOpen(true)}>
+          <Button variant="outline" size="lg" className="text-lg px-8 btn-premium" onClick={() => setJoinRoomOpen(true)}>
             Join Room
           </Button>
         </div>
@@ -34,7 +34,7 @@ export default function Home() {
 
       {/* Features Section */}
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <Card>
+        <Card className="card-premium">
           <CardHeader className="text-center">
             <Music className="h-12 w-12 mx-auto mb-2 text-primary" />
             <CardTitle>30-Second Clips</CardTitle>
@@ -46,7 +46,7 @@ export default function Home() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="card-premium">
           <CardHeader className="text-center">
             <Users className="h-12 w-12 mx-auto mb-2 text-primary" />
             <CardTitle>Multiplayer Fun</CardTitle>
@@ -58,7 +58,7 @@ export default function Home() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="card-premium">
           <CardHeader className="text-center">
             <Headphones className="h-12 w-12 mx-auto mb-2 text-primary" />
             <CardTitle>Custom Playlists</CardTitle>
@@ -70,7 +70,7 @@ export default function Home() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="card-premium">
           <CardHeader className="text-center">
             <Trophy className="h-12 w-12 mx-auto mb-2 text-primary" />
             <CardTitle>Competitive Scoring</CardTitle>

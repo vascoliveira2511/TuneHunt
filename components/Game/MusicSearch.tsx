@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Search, Play, Pause, Plus, Volume2, VolumeX } from "lucide-react"
 import type { SpotifyTrack } from "@/lib/spotify"
+import { Loading, MusicSearchSkeleton } from "@/components/ui/loading"
 
 interface MusicSearchProps {
   onTrackSelect: (track: SpotifyTrack) => void
@@ -136,8 +137,8 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         </div>
-        <Button onClick={handleSearch} disabled={loading || !query.trim()}>
-          {loading ? "Searching..." : "Search"}
+        <Button onClick={handleSearch} disabled={loading || !query.trim()} className="btn-premium">
+          {loading ? <Loading variant="spinner" size="sm" /> : "Search"}
         </Button>
       </div>
 
@@ -164,8 +165,11 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
 
       {/* Search Results */}
       <div className="space-y-2 max-h-96 overflow-y-auto">
-        {tracks.map((track) => (
-          <Card key={track.id} className="transition-all hover:bg-accent/50">
+        {loading ? (
+          <MusicSearchSkeleton />
+        ) : (
+          tracks.map((track) => (
+          <Card key={track.id} className="card-premium">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -228,7 +232,8 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
               </div>
             </CardContent>
           </Card>
-        ))}
+          ))
+        )}
 
         {tracks.length === 0 && query && !loading && (
           <div className="text-center py-8 text-muted-foreground">

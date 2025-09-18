@@ -62,8 +62,6 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const [showSongIntro, setShowSongIntro] = useState(false)
   const [showRoundEnd, setShowRoundEnd] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const introTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const ROUND_DURATION = 30 // seconds
   const POINTS_TITLE = 100
@@ -84,7 +82,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
           onGameEnd?.()
         } else {
           setGameState(data.gameState)
-          startRound(data.gameState)
+          // Game state will auto-start based on polling
         }
       }
     } catch (error) {
@@ -92,77 +90,24 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
     }
   }
 
-  const endRound = async () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-    }
+  // Server now handles round timing automatically
 
-    if (audioRef.current) {
-      audioRef.current.pause()
-    }
+  const startServerRound = async () => {
+    if (!isHost) return
 
-    // Show round end modal with song details
-    setShowRoundEnd(true)
-
-    // Move to next song after 5 seconds
-    setTimeout(() => {
-      setShowRoundEnd(false)
-      nextSong()
-    }, 5000)
-  }
-
-  const startRound = (state: GameState) => {
-    // Reset round state
-    setTitleGuess("")
-    setArtistGuess("")
-    setShowRoundEnd(false)
-
-    // Show song intro modal first
-    setShowSongIntro(true)
-
-    // Auto-close intro after 3 seconds and start the actual round
-    if (introTimeoutRef.current) {
-      clearTimeout(introTimeoutRef.current)
-    }
-
-    introTimeoutRef.current = setTimeout(() => {
-      setShowSongIntro(false)
-      startActualRound(state)
-    }, 3000)
-  }
-
-  const startActualRound = (state: GameState) => {
-    // Start timer
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-    }
-
-    timerRef.current = setInterval(() => {
-      setGameState(prev => {
-        if (!prev) return prev
-        const newTime = prev.timeRemaining - 1
-
-        if (newTime <= 0) {
-          endRound()
-          return { ...prev, timeRemaining: 0, isPlaying: false }
-        }
-
-        return { ...prev, timeRemaining: newTime }
+    try {
+      const response = await fetch(`/api/games/${gameId}/start-round`, {
+        method: 'POST'
       })
-    }, 1000)
 
-    // Start audio if available
-    console.log('🎵 Checking for audio:', {
-      previewUrl: state.currentSong.previewUrl,
-      currentSong: state.currentSong
-    })
-
-    if (state.currentSong.previewUrl) {
-      console.log('🎵 Preview URL found, starting audio...')
-      playAudio(state.currentSong.previewUrl)
-    } else {
-      console.log('❌ No preview URL available for current song')
-      // TODO: Handle no-audio mode - could show lyrics, album art, or skip to answer
+      if (response.ok) {
+        console.log('🎮 Server round started successfully')
+        // The polling will pick up the state change and start audio/UI automatically
+      } else {
+        console.error('Failed to start server round:', response.status)
+      }
+    } catch (error) {
+      console.error('Failed to start server round:', error)
     }
   }
 
@@ -177,7 +122,11 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
           const data = await response.json()
           console.log('🎮 GamePlay: Loaded game state:', data)
           setGameState(data.gameState)
-          startRound(data.gameState)
+
+          // Start playing if round has already started
+          if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
+            playAudio(data.gameState.currentSong.previewUrl)
+          }
         } else {
           console.error('Failed to load game state:', response.status)
         }
@@ -188,43 +137,80 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       }
     }
 
-    // Poll for real-time guess updates
-    const pollGuesses = async () => {
+    // Poll for complete game state changes (including round progression)
+    const pollGameState = async () => {
       try {
-        const response = await fetch(`/api/games/${gameId}/guesses`)
+        const response = await fetch(`/api/games/${gameId}/state`)
         if (response.ok) {
           const data = await response.json()
+
           setGameState(prev => {
-            if (!prev) return prev
+            if (!prev) {
+              // First load
+              if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
+                playAudio(data.gameState.currentSong.previewUrl)
+              }
+              return data.gameState
+            }
+
+            // Check if round has changed
+            if (prev.currentSongIndex !== data.gameState.currentSongIndex) {
+              console.log('🔄 Round changed, updating state')
+
+              // Auto-play new song if round is active
+              if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
+                playAudio(data.gameState.currentSong.previewUrl)
+              }
+
+              // Show song intro for new round
+              setShowSongIntro(true)
+              setTimeout(() => setShowSongIntro(false), 3000)
+
+              return data.gameState
+            }
+
+            // Check if round just started
+            if (!prev.isPlaying && data.gameState.isPlaying) {
+              console.log('▶️ Round started')
+              if (data.gameState.currentSong.previewUrl) {
+                playAudio(data.gameState.currentSong.previewUrl)
+              }
+            }
+
+            // Check if round ended
+            if (prev.timeRemaining > 0 && data.gameState.timeRemaining === 0) {
+              console.log('⏰ Round ended')
+              if (audioRef.current) {
+                audioRef.current.pause()
+              }
+              setShowRoundEnd(true)
+              setTimeout(() => setShowRoundEnd(false), 5000)
+            }
+
+            // Update the state with server timing
             return {
               ...prev,
-              guesses: data.guesses
+              ...data.gameState
             }
           })
         }
       } catch (error) {
-        console.error('Failed to poll guesses:', error)
+        console.error('Failed to poll game state:', error)
       }
     }
 
     loadGameState()
 
-    // Poll for guesses every 2 seconds
-    const guessInterval = setInterval(pollGuesses, 2000)
+    // Poll for complete game state every 1 second for real-time sync
+    const gameStateInterval = setInterval(pollGameState, 1000)
 
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
-      if (introTimeoutRef.current) {
-        clearTimeout(introTimeoutRef.current)
-      }
       if (audioRef.current) {
         audioRef.current.pause()
       }
-      clearInterval(guessInterval)
+      clearInterval(gameStateInterval)
     }
-  }, [gameId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gameId])
 
   const playAudio = (url: string) => {
     console.log('🎵 playAudio called with URL:', url)
@@ -438,6 +424,13 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                 </Button>
               )}
               
+              {isHost && !gameState.isPlaying && gameState.timeRemaining === 30 && (
+                <Button onClick={startServerRound} size="sm" className="btn-premium">
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Round
+                </Button>
+              )}
+
               {isHost && gameState.timeRemaining === 0 && (
                 <Button onClick={nextSong} size="sm">
                   <SkipForward className="h-4 w-4 mr-2" />

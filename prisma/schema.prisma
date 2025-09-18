@@ -177,6 +177,8 @@ model Game {
   status           GameStatus @default(SELECTING)
   startedAt        DateTime?
   finishedAt       DateTime?
+  roundStartedAt   DateTime?
+  roundDuration    Int      @default(30) // seconds
   createdAt        DateTime @default(now())
 
   room              Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)

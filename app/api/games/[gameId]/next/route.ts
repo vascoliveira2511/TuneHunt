@@ -64,8 +64,20 @@ export async function POST(
 
     const nextSongIndex = game.currentSongIndex + 1
 
+    // Determine total songs based on game type
+    let totalSongs: number
+    if (game.playlistId) {
+      const playlist = await prisma.playlist.findUnique({
+        where: { id: game.playlistId },
+        include: { songs: true }
+      })
+      totalSongs = playlist?.songs.length || 0
+    } else {
+      totalSongs = game.selectedSongs.length
+    }
+
     // Check if this was the last song
-    if (nextSongIndex >= game.selectedSongs.length) {
+    if (nextSongIndex >= totalSongs) {
       // Game is complete
       await prisma.game.update({
         where: { id: gameId },
@@ -78,28 +90,58 @@ export async function POST(
       return NextResponse.json({ gameComplete: true })
     }
 
-    // Move to next song
-    const nextSong = game.selectedSongs[nextSongIndex]
+    // Get next song based on game type
+    let nextSong
+    if (game.playlistId) {
+      const playlist = await prisma.playlist.findUnique({
+        where: { id: game.playlistId },
+        include: {
+          songs: {
+            include: { song: true },
+            orderBy: { position: 'asc' }
+          }
+        }
+      })
+      nextSong = playlist?.songs[nextSongIndex]
+      if (!nextSong) {
+        return NextResponse.json(
+          { error: 'Song not found in playlist' },
+          { status: 400 }
+        )
+      }
+    } else {
+      nextSong = game.selectedSongs[nextSongIndex]
+      if (!nextSong) {
+        return NextResponse.json(
+          { error: 'Song not found in selections' },
+          { status: 400 }
+        )
+      }
+    }
     
+    const songId = game.playlistId ? nextSong.song.id : nextSong.songId
+
     await prisma.game.update({
       where: { id: gameId },
       data: {
         currentSongIndex: nextSongIndex,
-        currentSongId: nextSong.songId
+        currentSongId: songId,
+        roundStartedAt: null // Reset round timer
       }
     })
 
     // Prepare new game state
+    const song = game.playlistId ? nextSong.song : nextSong.song
     const gameState = {
       currentSongIndex: nextSongIndex,
       currentSong: {
-        id: nextSong.song.id,
-        title: nextSong.song.title,
-        artist: nextSong.song.artist,
-        album: nextSong.song.album,
-        previewUrl: nextSong.song.previewUrl,
-        imageUrl: nextSong.song.imageUrl,
-        selectedBy: nextSong.selectedBy || ''
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        previewUrl: song.previewUrl,
+        imageUrl: song.imageUrl,
+        selectedBy: game.playlistId ? 'playlist' : ((nextSong as any).selectedBy || '')
       },
       timeRemaining: 30,
       isPlaying: false,

@@ -143,15 +143,51 @@ export async function GET(
       totalSongs = game.selectedSongs.length
     }
 
+    // Calculate time remaining based on server-side round timer
+    let timeRemaining = 30 // default
+    if (game.roundStartedAt) {
+      const now = new Date()
+      const elapsedSeconds = Math.floor((now.getTime() - game.roundStartedAt.getTime()) / 1000)
+      timeRemaining = Math.max(0, game.roundDuration - elapsedSeconds)
+    }
+
+    // Get all guesses for current round
+    const guesses = await prisma.guess.findMany({
+      where: {
+        gameId: gameId,
+        songId: currentSong.id
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    })
+
     // Prepare game state
     const gameState = {
       currentSongIndex: game.currentSongIndex || 0,
       currentSong,
-      timeRemaining: 30, // Reset timer for current round
-      isPlaying: false,
-      guesses: [],
+      timeRemaining,
+      isPlaying: game.roundStartedAt !== null,
+      guesses: guesses.map(guess => ({
+        id: guess.id,
+        userId: guess.userId,
+        userName: guess.user?.name || 'Unknown',
+        guessType: guess.guessType,
+        guessText: guess.guessText,
+        isCorrect: guess.isCorrect,
+        pointsAwarded: guess.pointsAwarded
+      })),
       roundScores: {},
-      totalSongs
+      totalSongs,
+      roundStartedAt: game.roundStartedAt
     }
 
     return NextResponse.json({ gameState })

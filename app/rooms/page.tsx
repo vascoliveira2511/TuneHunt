@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Users, Plus, Crown, Play, Clock, Music } from "lucide-react"
+import { Loading, RoomCardSkeleton } from "@/components/ui/loading"
 
 interface Room {
   id: string
@@ -159,8 +160,27 @@ export default function RoomsPage() {
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center">
-          <div className="text-lg">Loading rooms...</div>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Game Rooms</h1>
+            <p className="text-muted-foreground">
+              Join active games or create your own room
+            </p>
+          </div>
+          <Button disabled className="btn-premium">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Room
+          </Button>
+        </div>
+
+        <div className="flex justify-center mb-8">
+          <Loading variant="waveform" text="Loading rooms..." />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <RoomCardSkeleton key={i} />
+          ))}
         </div>
       </div>
     )
@@ -176,7 +196,7 @@ export default function RoomsPage() {
           </p>
         </div>
         
-        <Button onClick={handleCreateRoom}>
+        <Button onClick={handleCreateRoom} className="btn-premium">
           <Plus className="h-4 w-4 mr-2" />
           Create Room
         </Button>
@@ -244,7 +264,7 @@ export default function RoomsPage() {
               (room.status === 'WAITING')
             
             return (
-              <Card key={room.id} className="hover:shadow-lg transition-shadow">
+              <Card key={room.id} className="card-premium">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
