@@ -9,20 +9,27 @@ TuneHunt is a Next.js-based multiplayer "name that tune" game where players gues
 - **Backend**: Next.js API routes with Prisma ORM
 - **Database**: PostgreSQL with Prisma
 - **Authentication**: NextAuth.js
-- **Music API**: Spotify Web API integration
+- **Music API**: Deezer API integration
 - **UI Components**: shadcn/ui component library
 
 ### Key Features
 - Real-time multiplayer rooms with host controls
 - Two game modes: Individual Selection & Playlist-based
-- Spotify track search and preview playback
+- Deezer track search and preview playback
 - User authentication and session management
 - Room management with join codes
 - Score tracking and leaderboards
 
-## Current Project State (as of 2025-09-17)
+## Current Project State (as of 2025-09-18)
 
 ### ✅ Recently Completed Fixes
+
+#### Music API Migration (2025-09-18)
+- **Spotify → Deezer Migration**: Complete migration from Spotify to Deezer API
+  - Removed Spotify dependencies and authentication requirements
+  - Implemented Deezer API integration with reliable 30-second preview URLs
+  - Maintained API compatibility for existing components
+  - Updated TypeScript types and fixed compilation errors
 
 #### Build & Code Quality Issues
 - **ESLint/TypeScript Errors**: All compilation errors resolved
@@ -57,7 +64,7 @@ Key entities:
 - `Room` - Game rooms with host, settings, max players
 - `Game` - Individual game instances within rooms
 - `GameParticipant` - Player participation in games
-- `Song` - Track metadata from Spotify
+- `Song` - Track metadata from Deezer
 - `SelectedSong` - Player song selections for games
 - `Playlist` - Curated song collections
 
@@ -73,7 +80,7 @@ Key entities:
 - `app/room/[code]/page.tsx` - Individual room interface
 - `app/create-room/page.tsx` - Room creation wizard
 - `components/Game/TrackSelection.tsx` - Song selection interface
-- `components/Game/MusicSearch.tsx` - Spotify search integration
+- `components/Game/MusicSearch.tsx` - Deezer search integration
 
 ## Development Guidelines
 
@@ -116,7 +123,7 @@ Current implementation uses polling intervals:
 ### 🐛 Known Issues
 - No real WebSocket implementation (using polling)
 - No offline/reconnection handling
-- Limited error handling for Spotify API failures
+- Limited error handling for Deezer API failures
 
 ### 🚀 Planned Features
 - Real-time WebSocket implementation
@@ -128,7 +135,7 @@ Current implementation uses polling intervals:
 
 ### 🎯 Immediate Next Steps
 1. **WebSocket Integration**: Replace polling with real-time updates
-2. **Error Handling**: Improve Spotify API error handling
+2. **Error Handling**: Improve Deezer API error handling
 3. **Mobile Optimization**: Enhance mobile user experience
 4. **Testing**: Add comprehensive test coverage
 
@@ -148,7 +155,8 @@ TuneHunt/
 ├── lib/
 │   ├── auth.ts            # NextAuth configuration
 │   ├── prisma.ts          # Database client
-│   └── spotify.ts         # Spotify API integration
+│   ├── deezer.ts          # Deezer API integration
+│   └── spotify.ts         # Legacy file (now uses Deezer)
 └── prisma/
     └── schema.prisma      # Database schema
 ```
@@ -160,8 +168,9 @@ TuneHunt/
 DATABASE_URL="postgresql://..."
 NEXTAUTH_SECRET="..."
 NEXTAUTH_URL="http://localhost:3000"
-SPOTIFY_CLIENT_ID="..."
-SPOTIFY_CLIENT_SECRET="..."
+# Spotify credentials no longer needed - using Deezer API
+# SPOTIFY_CLIENT_ID="..."
+# SPOTIFY_CLIENT_SECRET="..."
 ```
 
 ### Development Commands
@@ -194,5 +203,5 @@ npx prisma generate  # Update Prisma client
 
 ---
 
-**Last Updated**: 2025-09-17  
-**Claude Code Session**: All ESLint/TypeScript errors resolved, core functionality fixes completed
+**Last Updated**: 2025-09-18
+**Claude Code Session**: Migrated from Spotify to Deezer API, maintained compatibility, all ESLint/TypeScript errors resolved

@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { Play, Pause, SkipForward, Trophy, Clock, Music, Send } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Play, Pause, SkipForward, Trophy, Clock, Music, Send, User } from "lucide-react"
 
 interface GamePlayProps {
   gameId: string
@@ -56,11 +57,13 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const [loading, setLoading] = useState(true)
   const [titleGuess, setTitleGuess] = useState("")
   const [artistGuess, setArtistGuess] = useState("")
-  const [hasGuessedTitle, setHasGuessedTitle] = useState(false)
-  const [hasGuessedArtist, setHasGuessedArtist] = useState(false)
+  // Remove guess limitations - allow unlimited attempts
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showSongIntro, setShowSongIntro] = useState(false)
+  const [showRoundEnd, setShowRoundEnd] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const introTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const ROUND_DURATION = 30 // seconds
   const POINTS_TITLE = 100
@@ -93,24 +96,42 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
     if (timerRef.current) {
       clearInterval(timerRef.current)
     }
-    
+
     if (audioRef.current) {
       audioRef.current.pause()
     }
 
-    // Show results for a moment, then move to next song
+    // Show round end modal with song details
+    setShowRoundEnd(true)
+
+    // Move to next song after 5 seconds
     setTimeout(() => {
+      setShowRoundEnd(false)
       nextSong()
-    }, 3000)
+    }, 5000)
   }
 
   const startRound = (state: GameState) => {
     // Reset round state
     setTitleGuess("")
     setArtistGuess("")
-    setHasGuessedTitle(false)
-    setHasGuessedArtist(false)
+    setShowRoundEnd(false)
 
+    // Show song intro modal first
+    setShowSongIntro(true)
+
+    // Auto-close intro after 3 seconds and start the actual round
+    if (introTimeoutRef.current) {
+      clearTimeout(introTimeoutRef.current)
+    }
+
+    introTimeoutRef.current = setTimeout(() => {
+      setShowSongIntro(false)
+      startActualRound(state)
+    }, 3000)
+  }
+
+  const startActualRound = (state: GameState) => {
     // Start timer
     if (timerRef.current) {
       clearInterval(timerRef.current)
@@ -120,12 +141,12 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       setGameState(prev => {
         if (!prev) return prev
         const newTime = prev.timeRemaining - 1
-        
+
         if (newTime <= 0) {
           endRound()
           return { ...prev, timeRemaining: 0, isPlaying: false }
         }
-        
+
         return { ...prev, timeRemaining: newTime }
       })
     }, 1000)
@@ -135,7 +156,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       previewUrl: state.currentSong.previewUrl,
       currentSong: state.currentSong
     })
-    
+
     if (state.currentSong.previewUrl) {
       console.log('🎵 Preview URL found, starting audio...')
       playAudio(state.currentSong.previewUrl)
@@ -145,13 +166,13 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
     }
   }
 
-  // Load current game state
+  // Load current game state and set up polling for real-time updates
   useEffect(() => {
     const loadGameState = async () => {
       try {
         console.log('🎮 GamePlay: Loading game state for gameId:', gameId)
         const response = await fetch(`/api/games/${gameId}/state`)
-        
+
         if (response.ok) {
           const data = await response.json()
           console.log('🎮 GamePlay: Loaded game state:', data)
@@ -167,15 +188,41 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       }
     }
 
+    // Poll for real-time guess updates
+    const pollGuesses = async () => {
+      try {
+        const response = await fetch(`/api/games/${gameId}/guesses`)
+        if (response.ok) {
+          const data = await response.json()
+          setGameState(prev => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              guesses: data.guesses
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Failed to poll guesses:', error)
+      }
+    }
+
     loadGameState()
+
+    // Poll for guesses every 2 seconds
+    const guessInterval = setInterval(pollGuesses, 2000)
 
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
       }
+      if (introTimeoutRef.current) {
+        clearTimeout(introTimeoutRef.current)
+      }
       if (audioRef.current) {
         audioRef.current.pause()
       }
+      clearInterval(guessInterval)
     }
   }, [gameId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -240,12 +287,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
 
       if (response.ok) {
         const data = await response.json()
-        
-        if (guessType === 'TITLE') {
-          setHasGuessedTitle(true)
-        } else {
-          setHasGuessedArtist(true)
-        }
+        // Note: Removed guess limitations - players can guess multiple times
 
         // Update game state with new guess
         setGameState(prev => {
@@ -259,6 +301,11 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
             }
           }
         })
+
+        // Show success feedback for correct guesses
+        if (data.guess.isCorrect) {
+          console.log(`🎉 Correct ${guessType} guess! +${data.guess.pointsAwarded} points`)
+        }
 
         // Clear the input
         if (guessType === 'TITLE') {
@@ -346,15 +393,22 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 rounded-md">
-              <AvatarImage 
-                src={gameState.currentSong.imageUrl} 
-                alt="Album cover"
-              />
-              <AvatarFallback className="rounded-md">
-                <Music className="h-8 w-8" />
-              </AvatarFallback>
-            </Avatar>
+            {/* Hide album cover during gameplay to prevent cheating */}
+            {gameState.timeRemaining === 0 ? (
+              <Avatar className="h-16 w-16 rounded-md">
+                <AvatarImage
+                  src={gameState.currentSong.imageUrl}
+                  alt="Album cover"
+                />
+                <AvatarFallback className="rounded-md">
+                  <Music className="h-8 w-8" />
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
+                <Music className="h-8 w-8 text-muted-foreground" />
+              </div>
+            )}
             
             <div className="flex-1">
               <div className="text-sm text-muted-foreground mb-1">
@@ -408,7 +462,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                   placeholder="Song title..."
                   value={titleGuess}
                   onChange={(e) => setTitleGuess(e.target.value)}
-                  disabled={hasGuessedTitle || isSubmitting}
+                  disabled={isSubmitting || gameState.timeRemaining === 0}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       submitGuess('TITLE', titleGuess)
@@ -417,15 +471,15 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                 />
                 <Button
                   onClick={() => submitGuess('TITLE', titleGuess)}
-                  disabled={hasGuessedTitle || isSubmitting || !titleGuess.trim()}
+                  disabled={isSubmitting || !titleGuess.trim() || gameState.timeRemaining === 0}
                   size="sm"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
-              {hasGuessedTitle && (
-                <Badge variant="secondary">Title guess submitted</Badge>
-              )}
+              <div className="text-xs text-muted-foreground">
+                You can guess multiple times!
+              </div>
               <div className="text-sm text-muted-foreground">
                 {POINTS_TITLE} points
               </div>
@@ -442,7 +496,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                   placeholder="Artist name..."
                   value={artistGuess}
                   onChange={(e) => setArtistGuess(e.target.value)}
-                  disabled={hasGuessedArtist || isSubmitting}
+                  disabled={isSubmitting || gameState.timeRemaining === 0}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       submitGuess('ARTIST', artistGuess)
@@ -451,15 +505,15 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                 />
                 <Button
                   onClick={() => submitGuess('ARTIST', artistGuess)}
-                  disabled={hasGuessedArtist || isSubmitting || !artistGuess.trim()}
+                  disabled={isSubmitting || !artistGuess.trim() || gameState.timeRemaining === 0}
                   size="sm"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
-              {hasGuessedArtist && (
-                <Badge variant="secondary">Artist guess submitted</Badge>
-              )}
+              <div className="text-xs text-muted-foreground">
+                You can guess multiple times!
+              </div>
               <div className="text-sm text-muted-foreground">
                 {POINTS_ARTIST} points
               </div>
@@ -512,32 +566,177 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
         </CardContent>
       </Card>
 
-      {/* Recent Guesses */}
+      {/* Live Guesses - Show all player guesses in real-time */}
       {gameState.guesses.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Guesses</CardTitle>
+            <CardTitle>Live Guesses</CardTitle>
+            <CardDescription>
+              Watch other players&apos; guesses in real-time!
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {gameState.guesses.slice(-5).reverse().map((guess) => (
-                <div key={guess.id} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {gameState.guesses.slice(-10).reverse().map((guess, index) => (
+                <div
+                  key={`${guess.id}-${index}`}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all duration-300 ${
+                    guess.isCorrect
+                      ? 'bg-green-100 border border-green-200 dark:bg-green-900/20 dark:border-green-800'
+                      : 'bg-muted/50'
+                  }`}
+                >
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{guess.userName}</span>
-                    <Badge variant={guess.isCorrect ? "default" : "outline"}>
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-xs">
+                        {guess.userName?.[0] || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium text-sm">{guess.userName}</span>
+                    <Badge variant={guess.isCorrect ? "default" : "outline"} className="text-xs">
                       {guess.guessType === 'TITLE' ? 'Title' : 'Artist'}
                     </Badge>
-                    <span className="text-sm">{guess.guessText}</span>
+                    <span className={`text-sm ${guess.isCorrect ? 'font-semibold text-green-800 dark:text-green-200' : ''}`}>
+                      {guess.guessText}
+                    </span>
                   </div>
-                  {guess.isCorrect && (
-                    <Badge variant="secondary">+{guess.pointsAwarded}</Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {guess.isCorrect && (
+                      <>
+                        <Badge variant="secondary" className="bg-green-200 text-green-800">
+                          🎉 +{guess.pointsAwarded}
+                        </Badge>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
+            {gameState.guesses.length === 0 && (
+              <div className="text-center text-muted-foreground py-4">
+                No guesses yet. Be the first to guess!
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
+
+      {/* Song Intro Modal */}
+      <Dialog open={showSongIntro} onOpenChange={setShowSongIntro}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">🎵 Next Song</DialogTitle>
+          </DialogHeader>
+          <div className="text-center space-y-4 py-4">
+            <div className="flex items-center justify-center gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarImage
+                  src={participants.find(p => p.user?.id === gameState?.currentSong.selectedBy)?.user?.image}
+                />
+                <AvatarFallback>
+                  <User className="h-6 w-6" />
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="text-sm text-muted-foreground">Selected by</div>
+                <div className="font-semibold">
+                  {gameState?.currentSong.selectedBy === 'playlist'
+                    ? 'Playlist'
+                    : participants.find(p => p.user?.id === gameState?.currentSong.selectedBy)?.displayName || 'Unknown'
+                  }
+                </div>
+              </div>
+            </div>
+            <div className="text-lg">
+              Round {(gameState?.currentSongIndex || 0) + 1}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Get ready to guess the song title and artist!
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Round End Modal */}
+      <Dialog open={showRoundEnd} onOpenChange={setShowRoundEnd}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">🎵 Round Complete!</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Song Details */}
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20 rounded-md">
+                <AvatarImage
+                  src={gameState?.currentSong.imageUrl}
+                  alt="Album cover"
+                />
+                <AvatarFallback className="rounded-md">
+                  <Music className="h-10 w-10" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="font-bold text-lg">{gameState?.currentSong.title}</div>
+                <div className="text-muted-foreground text-base">{gameState?.currentSong.artist}</div>
+                {gameState?.currentSong.album && (
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Album: {gameState.currentSong.album}
+                  </div>
+                )}
+                <div className="text-xs text-muted-foreground mt-2">
+                  Selected by: {gameState?.currentSong.selectedBy === 'playlist'
+                    ? 'Playlist'
+                    : participants.find(p => p.user?.id === gameState?.currentSong.selectedBy)?.displayName || 'Unknown'
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* Round Winners */}
+            {gameState?.guesses.filter(g => g.isCorrect).length > 0 && (
+              <div>
+                <div className="font-semibold mb-2">🏆 Correct Guesses:</div>
+                <div className="space-y-1">
+                  {gameState.guesses
+                    .filter(g => g.isCorrect)
+                    .reduce((acc, guess) => {
+                      const existing = acc.find(item => item.userId === guess.userId)
+                      if (existing) {
+                        existing.totalPoints += guess.pointsAwarded
+                        existing.guesses.push(guess)
+                      } else {
+                        acc.push({
+                          userId: guess.userId,
+                          userName: guess.userName,
+                          totalPoints: guess.pointsAwarded,
+                          guesses: [guess]
+                        })
+                      }
+                      return acc
+                    }, [] as Array<{userId: string, userName: string, totalPoints: number, guesses: Array<{guessType: string, pointsAwarded: number}>}>)
+                    .sort((a, b) => b.totalPoints - a.totalPoints)
+                    .map((winner) => (
+                      <div key={winner.userId} className="flex items-center justify-between p-2 bg-green-100 rounded dark:bg-green-900/20">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{winner.userName}</span>
+                          <div className="text-xs text-muted-foreground">
+                            {winner.guesses.map(g => g.guessType).join(', ')}
+                          </div>
+                        </div>
+                        <Badge variant="secondary">+{winner.totalPoints}</Badge>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+
+            <div className="text-center text-sm text-muted-foreground">
+              Next round starting automatically...
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

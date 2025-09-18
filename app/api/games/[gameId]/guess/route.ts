@@ -71,19 +71,21 @@ export async function POST(
       )
     }
 
-    // Check if user already guessed this type for this song
-    const existingGuess = await prisma.guess.findFirst({
+    // Allow unlimited guessing - removed restriction
+    // Check if user already got this one correct to avoid duplicate points
+    const existingCorrectGuess = await prisma.guess.findFirst({
       where: {
         gameId,
         userId: session.user.id,
         songId,
-        guessType: guessType as GuessType
+        guessType: guessType as GuessType,
+        isCorrect: true
       }
     })
 
-    if (existingGuess) {
+    if (existingCorrectGuess) {
       return NextResponse.json(
-        { error: 'Already guessed this category for this song' },
+        { error: 'Already guessed this category correctly' },
         { status: 400 }
       )
     }

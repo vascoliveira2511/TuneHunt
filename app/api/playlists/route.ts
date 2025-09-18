@@ -92,8 +92,8 @@ export async function POST(request: NextRequest) {
         description: description?.trim() || null,
         createdBy: session.user.id,
         isOfficial: false,
-        isPublished: false,
-        status: PlaylistStatus.PENDING
+        isPublished: true, // Auto-publish user playlists
+        status: PlaylistStatus.APPROVED // Auto-approve user playlists
       },
       include: {
         creator: {
