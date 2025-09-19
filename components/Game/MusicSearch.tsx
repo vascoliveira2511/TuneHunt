@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { Search, Play, Pause, Plus, Volume2, VolumeX } from "lucide-react"
 import type { SpotifyTrack } from "@/lib/spotify"
 import { Loading, MusicSearchSkeleton } from "@/components/ui/loading"
-import { getProxyAudioUrl, needsAudioProxy } from "@/lib/audio-proxy"
 
 interface MusicSearchProps {
   onTrackSelect: (track: SpotifyTrack) => void
@@ -80,12 +79,8 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       return
     }
 
-    // Use proxy for Deezer URLs to avoid CORS issues
-    const audioUrl = needsAudioProxy(track.preview_url)
-      ? getProxyAudioUrl(track.preview_url)
-      : track.preview_url
-
-    console.log('🎵 Using audio URL:', audioUrl, needsAudioProxy(track.preview_url) ? '(proxied)' : '(direct)')
+    // Note: Deezer preview URLs may have CORS restrictions
+    console.log('🎵 Attempting to play preview URL:', track.preview_url)
 
     if (playingTrack === track.id) {
       audioRef.current?.pause()
@@ -97,14 +92,14 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       audioRef.current.pause()
     }
 
-    console.log('🎵 Attempting to play preview:', audioUrl)
+    console.log('🎵 Attempting to play preview:', track.preview_url)
 
     const audio = new Audio()
     audio.volume = audioVolume
     audioRef.current = audio
 
     // Set source
-    audio.src = audioUrl
+    audio.src = track.preview_url
 
     audio.play()
       .then(() => {
@@ -113,7 +108,12 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       })
       .catch((error) => {
         console.error('❌ Failed to play preview:', error)
-        console.error('URL:', audioUrl)
+        console.error('URL:', track.preview_url)
+
+        // Show user-friendly message for CORS issues
+        if (track.preview_url && track.preview_url.includes('dzcdn.net')) {
+          console.log('💡 This Deezer track preview cannot play due to browser restrictions. This is a known limitation.')
+        }
         setPlayingTrack(null)
       })
 

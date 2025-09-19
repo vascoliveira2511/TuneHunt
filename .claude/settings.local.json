@@ -21,7 +21,8 @@
       "WebSearch",
       "WebFetch(domain:developer.spotify.com)",
       "WebFetch(domain:developers.deezer.com)",
-      "WebFetch(domain:api.deezer.com)"
+      "WebFetch(domain:api.deezer.com)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
