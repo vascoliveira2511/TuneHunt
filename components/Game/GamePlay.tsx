@@ -61,7 +61,6 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSongIntro, setShowSongIntro] = useState(false)
   const [showRoundEnd, setShowRoundEnd] = useState(false)
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false)
   const [isAdvancingRound, setIsAdvancingRound] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('connected')
   const [retryCount, setRetryCount] = useState(0)
@@ -262,17 +261,10 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const playAudio = useCallback((url: string, serverStartTime?: number) => {
     console.log('🎵 playAudio called with URL:', url, 'serverStartTime:', serverStartTime)
 
-    // Prevent overlapping audio plays
-    if (isPlayingAudio) {
-      console.log('🎵 Audio already playing, skipping...')
-      return
-    }
-
+    // Stop current audio if playing
     if (audioRef.current) {
       audioRef.current.pause()
     }
-
-    setIsPlayingAudio(true)
     const audio = new Audio(url)
     audio.volume = 0.3
     audioRef.current = audio
@@ -298,17 +290,15 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       })
       .catch((error) => {
         console.error('❌ Audio play failed:', error)
-        setIsPlayingAudio(false)
       })
     
     setGameState(prev => prev ? { ...prev, isPlaying: true } : prev)
 
     audio.onended = () => {
       console.log('🔚 Audio ended')
-      setIsPlayingAudio(false)
       setGameState(prev => prev ? { ...prev, isPlaying: false } : prev)
     }
-  }, [isPlayingAudio])
+  }, [])
 
   const toggleAudio = () => {
     if (!audioRef.current || !gameState) return
@@ -411,9 +401,9 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   }
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-200px)]">
+    <div className="flex flex-col lg:flex-row gap-6">
       {/* Main Game Area */}
-      <div className="flex-1 space-y-6 overflow-y-auto">
+      <div className="flex-1 space-y-6">
       {/* Game Header */}
       <Card>
         <CardHeader>
@@ -613,61 +603,18 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
         </>
       )}
 
-      {/* Live Scores */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5" />
-            Live Scores
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {participants
-              .sort((a, b) => getPlayerScore(b.user?.id || '') - getPlayerScore(a.user?.id || ''))
-              .map((participant, index) => (
-                <div key={participant.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                      {index + 1}
-                    </div>
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={participant.user?.image} />
-                      <AvatarFallback>
-                        {participant.displayName?.[0] || participant.user?.name?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium">
-                      {participant.displayName || participant.user?.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {gameState.roundScores[participant.user?.id || ''] > 0 && (
-                      <Badge variant="secondary">
-                        +{gameState.roundScores[participant.user?.id || '']}
-                      </Badge>
-                    )}
-                    <span className="font-bold text-lg">
-                      {getPlayerScore(participant.user?.id || '')}
-                    </span>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
 
       </div>
 
       {/* Right Sidebar - Chat & Scores */}
-      <div className="w-80 space-y-4 overflow-y-auto">
+      <div className="w-full lg:w-80 space-y-4">
         {/* Live Guesses */}
-        <Card className="h-96">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Live Guesses</CardTitle>
           </CardHeader>
           <CardContent className="p-3">
-            <div className="space-y-2 max-h-80 overflow-y-auto">
+            <div className="space-y-2 max-h-64 overflow-y-auto">
               {gameState.guesses.length > 0 ? (
                 gameState.guesses.slice(-20).reverse().map((guess, index) => (
                   <div
