@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, Pause, SkipForward, Trophy, Clock, Music, Send, User } from "lucide-react"
+import { getProxyAudioUrl, needsAudioProxy } from "@/lib/audio-proxy"
 
 interface GamePlayProps {
   gameId: string
@@ -261,13 +262,16 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   }, [gameId, isHost, currentUserId, isAdvancingRound, retryCount])
 
   const playAudio = useCallback((url: string, serverStartTime?: number) => {
-    console.log('🎵 playAudio called with URL:', url, 'serverStartTime:', serverStartTime)
+    // Use proxy for Deezer URLs to avoid CORS issues
+    const audioUrl = needsAudioProxy(url) ? getProxyAudioUrl(url) : url
+
+    console.log('🎵 playAudio called with URL:', audioUrl, 'serverStartTime:', serverStartTime, needsAudioProxy(url) ? '(proxied)' : '(direct)')
 
     // Stop current audio if playing
     if (audioRef.current) {
       audioRef.current.pause()
     }
-    const audio = new Audio(url)
+    const audio = new Audio(audioUrl)
     audio.volume = 0.3
     audioRef.current = audio
 

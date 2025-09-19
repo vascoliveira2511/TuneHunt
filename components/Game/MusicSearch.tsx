@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Search, Play, Pause, Plus, Volume2, VolumeX } from "lucide-react"
 import type { SpotifyTrack } from "@/lib/spotify"
 import { Loading, MusicSearchSkeleton } from "@/components/ui/loading"
+import { getProxyAudioUrl, needsAudioProxy } from "@/lib/audio-proxy"
 
 interface MusicSearchProps {
   onTrackSelect: (track: SpotifyTrack) => void
@@ -79,11 +80,12 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       return
     }
 
-    // Check if this is a Deezer URL which typically has CORS issues
-    if (track.preview_url.includes('dzcdn.net')) {
-      console.warn('⚠️ Deezer previews may not work due to CORS restrictions')
-      // Still attempt to play, but user will see the error
-    }
+    // Use proxy for Deezer URLs to avoid CORS issues
+    const audioUrl = needsAudioProxy(track.preview_url)
+      ? getProxyAudioUrl(track.preview_url)
+      : track.preview_url
+
+    console.log('🎵 Using audio URL:', audioUrl, needsAudioProxy(track.preview_url) ? '(proxied)' : '(direct)')
 
     if (playingTrack === track.id) {
       audioRef.current?.pause()
@@ -95,14 +97,14 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       audioRef.current.pause()
     }
 
-    console.log('🎵 Attempting to play preview:', track.preview_url)
+    console.log('🎵 Attempting to play preview:', audioUrl)
 
     const audio = new Audio()
     audio.volume = audioVolume
     audioRef.current = audio
 
     // Set source
-    audio.src = track.preview_url
+    audio.src = audioUrl
 
     audio.play()
       .then(() => {
@@ -111,13 +113,8 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       })
       .catch((error) => {
         console.error('❌ Failed to play preview:', error)
-        console.error('URL:', track.preview_url)
+        console.error('URL:', audioUrl)
         setPlayingTrack(null)
-
-        // Show user-friendly message for Deezer CORS issues
-        if (track.preview_url && track.preview_url.includes('dzcdn.net')) {
-          console.log('💡 This appears to be a Deezer track with CORS restrictions. Previews may not work in browser.')
-        }
       })
 
     audio.onended = () => {
