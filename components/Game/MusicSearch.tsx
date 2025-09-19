@@ -74,7 +74,10 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
   }
 
   const playPreview = (track: SpotifyTrack) => {
-    if (!track.preview_url) return
+    if (!track.preview_url) {
+      console.warn('No preview URL available for track:', track.name)
+      return
+    }
 
     if (playingTrack === track.id) {
       audioRef.current?.pause()
@@ -86,20 +89,42 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       audioRef.current.pause()
     }
 
-    const audio = new Audio(track.preview_url)
+    console.log('🎵 Attempting to play preview:', track.preview_url)
+
+    const audio = new Audio()
+    audio.crossOrigin = 'anonymous'  // Try to handle CORS
+    audio.preload = 'none'
     audio.volume = audioVolume
     audioRef.current = audio
 
-    audio.play().catch(console.error)
-    setPlayingTrack(track.id)
+    // Set source after creating audio element
+    audio.src = track.preview_url
+
+    audio.play()
+      .then(() => {
+        console.log('✅ Preview playing successfully')
+        setPlayingTrack(track.id)
+      })
+      .catch((error) => {
+        console.error('❌ Failed to play preview:', error)
+        console.error('Preview URL was:', track.preview_url)
+        setPlayingTrack(null)
+
+        // Try alternative approach for Deezer URLs
+        if (track.preview_url.includes('dzcdn.net')) {
+          console.log('🔄 Attempting Deezer preview with iframe approach...')
+          // We could implement an iframe-based approach here if needed
+        }
+      })
 
     audio.onended = () => {
+      console.log('🔚 Preview ended')
       setPlayingTrack(null)
     }
 
-    audio.onerror = () => {
+    audio.onerror = (error) => {
+      console.error('🚫 Audio error event:', error)
       setPlayingTrack(null)
-      console.error('Failed to play preview')
     }
   }
 
