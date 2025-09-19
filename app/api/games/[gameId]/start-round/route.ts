@@ -57,6 +57,8 @@ export async function POST(
 
     // Start the round with server-side timer
     const now = new Date()
+    const roundStartTimestamp = now.getTime() // Get precise millisecond timestamp
+
     await prisma.game.update({
       where: { id: gameId },
       data: {
@@ -64,9 +66,12 @@ export async function POST(
       }
     })
 
+    console.log('🎮 Round started at server time:', roundStartTimestamp)
+
     return NextResponse.json({
       success: true,
-      roundStartedAt: now
+      roundStartedAt: now,
+      serverTimestamp: roundStartTimestamp
     })
   } catch (error) {
     console.error('Error starting round:', error)

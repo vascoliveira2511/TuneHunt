@@ -138,16 +138,20 @@ export async function GET(
         album: selectedSong.song.album,
         previewUrl: selectedSong.song.previewUrl,
         imageUrl: selectedSong.song.imageUrl,
-        selectedBy: selectedSong.selectedBy || ''
+        selectedBy: selectedSong.selectedBy || null
       }
       totalSongs = game.selectedSongs.length
     }
 
     // Calculate time remaining based on server-side round timer
+    const now = new Date()
+    const serverTimestamp = now.getTime()
     let timeRemaining = 30 // default
+    let roundStartTimestamp = null
+
     if (game.roundStartedAt) {
-      const now = new Date()
-      const elapsedSeconds = Math.floor((now.getTime() - game.roundStartedAt.getTime()) / 1000)
+      roundStartTimestamp = game.roundStartedAt.getTime()
+      const elapsedSeconds = Math.floor((serverTimestamp - roundStartTimestamp) / 1000)
       timeRemaining = Math.max(0, game.roundDuration - elapsedSeconds)
     }
 
@@ -170,6 +174,9 @@ export async function GET(
       }
     })
 
+    // Add debug logging for selectedBy field
+    console.log('🔍 State API - selectedBy:', currentSong.selectedBy, 'for song:', currentSong.title)
+
     // Prepare game state
     const gameState = {
       currentSongIndex: game.currentSongIndex || 0,
@@ -187,7 +194,9 @@ export async function GET(
       })),
       roundScores: {},
       totalSongs,
-      roundStartedAt: game.roundStartedAt
+      roundStartedAt: game.roundStartedAt,
+      roundStartTimestamp,
+      serverTimestamp
     }
 
     return NextResponse.json({ gameState })

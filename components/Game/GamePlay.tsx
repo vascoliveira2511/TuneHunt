@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -61,6 +61,10 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSongIntro, setShowSongIntro] = useState(false)
   const [showRoundEnd, setShowRoundEnd] = useState(false)
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false)
+  const [isAdvancingRound, setIsAdvancingRound] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('connected')
+  const [retryCount, setRetryCount] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const ROUND_DURATION = 30 // seconds
@@ -148,7 +152,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
             if (!prev) {
               // First load
               if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
-                playAudio(data.gameState.currentSong.previewUrl)
+                playAudio(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
               }
               return data.gameState
             }
@@ -159,7 +163,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
 
               // Auto-play new song if round is active
               if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
-                playAudio(data.gameState.currentSong.previewUrl)
+                playAudio(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
               }
 
               // Show song intro for new round
@@ -173,7 +177,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
             if (!prev.isPlaying && data.gameState.isPlaying) {
               console.log('▶️ Round started')
               if (data.gameState.currentSong.previewUrl) {
-                playAudio(data.gameState.currentSong.previewUrl)
+                playAudio(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
               }
             }
 
@@ -187,7 +191,8 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
               setTimeout(() => setShowRoundEnd(false), 5000)
 
               // Auto-advance to next round after 7 seconds (2s after modal closes)
-              if (isHost) {
+              if (isHost && !isAdvancingRound) {
+                setIsAdvancingRound(true)
                 setTimeout(async () => {
                   try {
                     const nextResponse = await fetch(`/api/games/${gameId}/next`, {
@@ -198,10 +203,15 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                     }
                   } catch (error) {
                     console.error('Failed to auto-advance:', error)
+                  } finally {
+                    setIsAdvancingRound(false)
                   }
                 }, 7000)
               }
             }
+
+            // Add debug logging for selectedBy sync
+            console.log('🔍 Client - selectedBy:', data.gameState.currentSong.selectedBy, 'currentUserId:', currentUserId, 'matches:', data.gameState.currentSong.selectedBy === currentUserId)
 
             // Update the state with server timing
             return {
@@ -210,15 +220,36 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
             }
           })
         }
+
+        // Reset retry count on successful poll
+        if (retryCount > 0) {
+          setRetryCount(0)
+          setConnectionStatus('connected')
+        }
       } catch (error) {
         console.error('Failed to poll game state:', error)
+        setConnectionStatus('error')
+
+        // Implement exponential backoff for retries
+        const newRetryCount = retryCount + 1
+        setRetryCount(newRetryCount)
+
+        if (newRetryCount < 5) {
+          console.log(`🔄 Retrying in ${newRetryCount * 1000}ms...`)
+          setTimeout(() => {
+            pollGameState()
+          }, newRetryCount * 1000)
+        } else {
+          setConnectionStatus('disconnected')
+          console.error('⚠️ Max retries reached, stopping polling')
+        }
       }
     }
 
     loadGameState()
 
-    // Poll for complete game state every 1 second for real-time sync
-    const gameStateInterval = setInterval(pollGameState, 1000)
+    // Poll for complete game state more frequently for better sync (500ms during active play)
+    const gameStateInterval = setInterval(pollGameState, 500)
 
     return () => {
       if (audioRef.current) {
@@ -226,18 +257,39 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       }
       clearInterval(gameStateInterval)
     }
-  }, [gameId, isHost])
+  }, [gameId, isHost, currentUserId, isAdvancingRound, retryCount])
 
-  const playAudio = (url: string) => {
-    console.log('🎵 playAudio called with URL:', url)
-    
+  const playAudio = useCallback((url: string, serverStartTime?: number) => {
+    console.log('🎵 playAudio called with URL:', url, 'serverStartTime:', serverStartTime)
+
+    // Prevent overlapping audio plays
+    if (isPlayingAudio) {
+      console.log('🎵 Audio already playing, skipping...')
+      return
+    }
+
     if (audioRef.current) {
       audioRef.current.pause()
     }
 
+    setIsPlayingAudio(true)
     const audio = new Audio(url)
     audio.volume = 0.3
     audioRef.current = audio
+
+    // Calculate audio sync offset if server start time is provided
+    if (serverStartTime) {
+      const clientTime = Date.now()
+      const elapsedMs = clientTime - serverStartTime
+      const elapsedSeconds = Math.max(0, elapsedMs / 1000)
+
+      console.log('🎵 Audio sync - elapsed since server start:', elapsedSeconds, 'seconds')
+
+      // Only apply offset if it's reasonable (not too far ahead)
+      if (elapsedSeconds < 30) {
+        audio.currentTime = elapsedSeconds
+      }
+    }
 
     console.log('🔊 Attempting to play audio...')
     audio.play()
@@ -246,15 +298,17 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       })
       .catch((error) => {
         console.error('❌ Audio play failed:', error)
+        setIsPlayingAudio(false)
       })
     
     setGameState(prev => prev ? { ...prev, isPlaying: true } : prev)
 
     audio.onended = () => {
       console.log('🔚 Audio ended')
+      setIsPlayingAudio(false)
       setGameState(prev => prev ? { ...prev, isPlaying: false } : prev)
     }
-  }
+  }, [isPlayingAudio])
 
   const toggleAudio = () => {
     if (!audioRef.current || !gameState) return
@@ -383,6 +437,11 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
               {gameState.timeRemaining === 0 && (
                 <Badge variant="destructive">Time&apos;s up!</Badge>
               )}
+              {connectionStatus !== 'connected' && (
+                <Badge variant={connectionStatus === 'error' ? 'destructive' : 'secondary'}>
+                  {connectionStatus === 'error' ? `Reconnecting... (${retryCount}/5)` : 'Disconnected'}
+                </Badge>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -468,7 +527,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       {gameState.timeRemaining > 0 && (
         <>
           {/* Show message if user selected this song */}
-          {gameState.currentSong.selectedBy === currentUserId && (
+          {gameState.currentSong.selectedBy && gameState.currentSong.selectedBy === currentUserId && (
             <Card className="bg-primary/5 border-primary/20">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-center gap-2 text-primary">
@@ -480,7 +539,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
           )}
 
           {/* Guess inputs - disabled for song selector */}
-          {gameState.currentSong.selectedBy !== currentUserId && (
+          {(!gameState.currentSong.selectedBy || gameState.currentSong.selectedBy !== currentUserId) && (
             <div className="grid md:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
