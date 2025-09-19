@@ -79,6 +79,12 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       return
     }
 
+    // Check if this is a Deezer URL which typically has CORS issues
+    if (track.preview_url.includes('dzcdn.net')) {
+      console.warn('⚠️ Deezer previews may not work due to CORS restrictions')
+      // Still attempt to play, but user will see the error
+    }
+
     if (playingTrack === track.id) {
       audioRef.current?.pause()
       setPlayingTrack(null)
@@ -92,12 +98,10 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
     console.log('🎵 Attempting to play preview:', track.preview_url)
 
     const audio = new Audio()
-    audio.crossOrigin = 'anonymous'  // Try to handle CORS
-    audio.preload = 'none'
     audio.volume = audioVolume
     audioRef.current = audio
 
-    // Set source after creating audio element
+    // Set source
     audio.src = track.preview_url
 
     audio.play()
@@ -107,13 +111,12 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       })
       .catch((error) => {
         console.error('❌ Failed to play preview:', error)
-        console.error('Preview URL was:', track.preview_url)
+        console.error('URL:', track.preview_url)
         setPlayingTrack(null)
 
-        // Try alternative approach for Deezer URLs
-        if (track.preview_url.includes('dzcdn.net')) {
-          console.log('🔄 Attempting Deezer preview with iframe approach...')
-          // We could implement an iframe-based approach here if needed
+        // Show user-friendly message for Deezer CORS issues
+        if (track.preview_url && track.preview_url.includes('dzcdn.net')) {
+          console.log('💡 This appears to be a Deezer track with CORS restrictions. Previews may not work in browser.')
         }
       })
 
@@ -122,8 +125,8 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       setPlayingTrack(null)
     }
 
-    audio.onerror = (error) => {
-      console.error('🚫 Audio error event:', error)
+    audio.onerror = () => {
+      console.error('🚫 Audio error occurred')
       setPlayingTrack(null)
     }
   }

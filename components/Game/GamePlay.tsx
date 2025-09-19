@@ -65,6 +65,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('connected')
   const [retryCount, setRetryCount] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const playAudioRef = useRef<((url: string, serverStartTime?: number) => void) | null>(null)
 
   const ROUND_DURATION = 30 // seconds
   const POINTS_TITLE = 100
@@ -151,7 +152,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
             if (!prev) {
               // First load
               if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
-                playAudio(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
+                playAudioRef.current?.(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
               }
               return data.gameState
             }
@@ -162,7 +163,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
 
               // Auto-play new song if round is active
               if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
-                playAudio(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
+                playAudioRef.current?.(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
               }
 
               // Show song intro for new round
@@ -176,7 +177,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
             if (!prev.isPlaying && data.gameState.isPlaying) {
               console.log('▶️ Round started')
               if (data.gameState.currentSong.previewUrl) {
-                playAudio(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
+                playAudioRef.current?.(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
               }
             }
 
@@ -256,6 +257,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       }
       clearInterval(gameStateInterval)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, isHost, currentUserId, isAdvancingRound, retryCount])
 
   const playAudio = useCallback((url: string, serverStartTime?: number) => {
@@ -299,6 +301,9 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       setGameState(prev => prev ? { ...prev, isPlaying: false } : prev)
     }
   }, [])
+
+  // Assign to ref to avoid circular dependency
+  playAudioRef.current = playAudio
 
   const toggleAudio = () => {
     if (!audioRef.current || !gameState) return
