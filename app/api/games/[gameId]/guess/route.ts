@@ -41,6 +41,10 @@ export async function POST(
         include: {
           participants: {
             where: { userId: session.user.id }
+          },
+          selectedSongs: {
+            where: { songId },
+            include: { selector: true }
           }
         }
       }),
@@ -71,6 +75,15 @@ export async function POST(
       )
     }
 
+    // Check if user selected this song (prevent guessing own song)
+    const selectedSong = game.selectedSongs[0]
+    if (selectedSong && selectedSong.selectedBy === session.user.id) {
+      return NextResponse.json(
+        { error: 'You cannot guess your own song!' },
+        { status: 400 }
+      )
+    }
+
     // Allow unlimited guessing - removed restriction
     // Check if user already got this one correct to avoid duplicate points
     const existingCorrectGuess = await prisma.guess.findFirst({
@@ -94,14 +107,52 @@ export async function POST(
     let isCorrect = false
     let pointsAwarded = 0
 
-    const normalizeText = (text: string) => 
+    const normalizeText = (text: string) =>
       text.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ')
 
+    // Enhanced fuzzy matching function
+    const fuzzyMatch = (guess: string, correct: string): boolean => {
+      const normalizedGuess = normalizeText(guess)
+      const normalizedCorrect = normalizeText(correct)
+
+      // Exact match
+      if (normalizedGuess === normalizedCorrect) return true
+
+      // Handle common variations
+      const variations = [
+        normalizedCorrect.replace(/^the\s+/, ''), // Remove "the" from beginning
+        normalizedCorrect.replace(/\s+the\s+/, ' '), // Remove "the" from middle
+        normalizedCorrect.replace(/\s+&\s+/, ' and '), // & to and
+        normalizedCorrect.replace(/\s+and\s+/, ' & '), // and to &
+        normalizedCorrect.replace(/\s+feat\.?\s+.*/, ''), // Remove feat. parts
+        normalizedCorrect.replace(/\s+ft\.?\s+.*/, ''), // Remove ft. parts
+      ]
+
+      for (const variation of variations) {
+        if (normalizedGuess === variation) return true
+      }
+
+      // Check if guess contains most of the correct answer (for partial matches)
+      const words = normalizedCorrect.split(' ')
+      if (words.length > 1) {
+        const guessWords = normalizedGuess.split(' ')
+        const matchingWords = words.filter(word =>
+          guessWords.some(guessWord =>
+            guessWord.includes(word) || word.includes(guessWord)
+          )
+        )
+        // Accept if 80% of words match
+        if (matchingWords.length / words.length >= 0.8) return true
+      }
+
+      return false
+    }
+
     if (guessType === 'TITLE') {
-      isCorrect = normalizeText(guessText) === normalizeText(song.title)
+      isCorrect = fuzzyMatch(guessText, song.title)
       pointsAwarded = isCorrect ? 100 : 0
     } else if (guessType === 'ARTIST') {
-      isCorrect = normalizeText(guessText) === normalizeText(song.artist)
+      isCorrect = fuzzyMatch(guessText, song.artist)
       pointsAwarded = isCorrect ? 50 : 0
     }
 
@@ -136,6 +187,7 @@ export async function POST(
 
     // Update participant score if correct
     if (isCorrect && pointsAwarded > 0) {
+      // Award points to the guesser
       await prisma.gameParticipant.update({
         where: {
           gameId_userId: {
@@ -149,6 +201,25 @@ export async function POST(
           }
         }
       })
+
+      // Award points to the song selector (if not playlist)
+      if (selectedSong && selectedSong.selectedBy && selectedSong.selectedBy !== 'playlist') {
+        const selectorPoints = guessType === 'TITLE' ? 20 : 10 // 20 for title, 10 for artist
+
+        await prisma.gameParticipant.update({
+          where: {
+            gameId_userId: {
+              gameId,
+              userId: selectedSong.selectedBy
+            }
+          },
+          data: {
+            score: {
+              increment: selectorPoints
+            }
+          }
+        })
+      }
     }
 
     return NextResponse.json({

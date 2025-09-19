@@ -185,6 +185,22 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
               }
               setShowRoundEnd(true)
               setTimeout(() => setShowRoundEnd(false), 5000)
+
+              // Auto-advance to next round after 7 seconds (2s after modal closes)
+              if (isHost) {
+                setTimeout(async () => {
+                  try {
+                    const nextResponse = await fetch(`/api/games/${gameId}/next`, {
+                      method: 'POST'
+                    })
+                    if (nextResponse.ok) {
+                      console.log('🎮 Auto-advanced to next round')
+                    }
+                  } catch (error) {
+                    console.error('Failed to auto-advance:', error)
+                  }
+                }, 7000)
+              }
             }
 
             // Update the state with server timing
@@ -210,7 +226,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       }
       clearInterval(gameStateInterval)
     }
-  }, [gameId])
+  }, [gameId, isHost])
 
   const playAudio = (url: string) => {
     console.log('🎵 playAudio called with URL:', url)
@@ -299,6 +315,10 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
         } else {
           setArtistGuess("")
         }
+      } else {
+        const errorData = await response.json()
+        console.error('Guess failed:', errorData.error)
+        // Could add toast notification here
       }
     } catch (error) {
       console.error('Failed to submit guess:', error)
@@ -337,7 +357,9 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex gap-6 h-[calc(100vh-200px)]">
+      {/* Main Game Area */}
+      <div className="flex-1 space-y-6 overflow-y-auto">
       {/* Game Header */}
       <Card>
         <CardHeader>
@@ -444,7 +466,22 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
 
       {/* Guess Section */}
       {gameState.timeRemaining > 0 && (
-        <div className="grid md:grid-cols-2 gap-4">
+        <>
+          {/* Show message if user selected this song */}
+          {gameState.currentSong.selectedBy === currentUserId && (
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-center gap-2 text-primary">
+                  <Music className="h-5 w-5" />
+                  <span className="font-medium">This is your song! Enjoy watching others guess 🎵</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Guess inputs - disabled for song selector */}
+          {gameState.currentSong.selectedBy !== currentUserId && (
+            <div className="grid md:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Guess the Title</CardTitle>
@@ -513,6 +550,8 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
             </CardContent>
           </Card>
         </div>
+          )}
+        </>
       )}
 
       {/* Live Scores */}
@@ -559,60 +598,134 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
         </CardContent>
       </Card>
 
-      {/* Live Guesses - Show all player guesses in real-time */}
-      {gameState.guesses.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Live Guesses</CardTitle>
-            <CardDescription>
-              Watch other players&apos; guesses in real-time!
-            </CardDescription>
+      </div>
+
+      {/* Right Sidebar - Chat & Scores */}
+      <div className="w-80 space-y-4 overflow-y-auto">
+        {/* Live Guesses */}
+        <Card className="h-96">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Live Guesses</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {gameState.guesses.slice(-10).reverse().map((guess, index) => (
-                <div
-                  key={`${guess.id}-${index}`}
-                  className={`flex items-center justify-between p-3 rounded-lg transition-all duration-300 ${
-                    guess.isCorrect
-                      ? 'bg-primary/10 border border-primary/20 dark:bg-primary/10 dark:border-primary/30'
-                      : 'bg-muted/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
+          <CardContent className="p-3">
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {gameState.guesses.length > 0 ? (
+                gameState.guesses.slice(-20).reverse().map((guess, index) => (
+                  <div
+                    key={`${guess.id}-${index}`}
+                    className={`flex items-start gap-2 p-2 rounded text-sm ${
+                      guess.isCorrect ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'
+                    }`}
+                  >
+                    <Avatar className="h-6 w-6 mt-0.5">
                       <AvatarFallback className="text-xs">
                         {guess.userName?.[0] || '?'}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="font-medium text-sm">{guess.userName}</span>
-                    <Badge variant={guess.isCorrect ? "default" : "outline"} className="text-xs">
-                      {guess.guessType === 'TITLE' ? 'Title' : 'Artist'}
-                    </Badge>
-                    <span className={`text-sm ${guess.isCorrect ? 'font-semibold text-primary' : ''}`}>
-                      {guess.guessText}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {guess.isCorrect && (
-                      <>
-                        <Badge variant="secondary" className="bg-primary/20 text-primary">
-                          🎉 +{guess.pointsAwarded}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 mb-1">
+                        <span className="font-medium truncate">{guess.userName}</span>
+                        <Badge variant={guess.isCorrect ? "default" : "outline"} className="text-xs">
+                          {guess.guessType === 'TITLE' ? 'Title' : 'Artist'}
                         </Badge>
-                      </>
-                    )}
+                        {guess.isCorrect && (
+                          <Badge variant="secondary" className="bg-primary/20 text-primary text-xs">
+                            +{guess.pointsAwarded}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className={`text-xs ${guess.isCorrect ? 'font-medium text-primary' : 'text-muted-foreground'} truncate`}>
+                        {guess.isCorrect && gameState.timeRemaining > 0
+                          ? '✓ Correct!'
+                          : guess.guessText
+                        }
+                      </div>
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center text-muted-foreground py-8 text-sm">
+                  No guesses yet. Be the first to guess!
                 </div>
-              ))}
+              )}
             </div>
-            {gameState.guesses.length === 0 && (
-              <div className="text-center text-muted-foreground py-4">
-                No guesses yet. Be the first to guess!
-              </div>
-            )}
           </CardContent>
         </Card>
-      )}
+
+        {/* Live Scores */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Trophy className="h-5 w-5" />
+              Live Scores
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            <div className="space-y-2">
+              {participants
+                .sort((a, b) => getPlayerScore(b.user?.id || '') - getPlayerScore(a.user?.id || ''))
+                .map((participant, index) => (
+                  <div
+                    key={participant.user?.id || index}
+                    className={`flex items-center justify-between p-2 rounded ${
+                      index === 0 ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono w-6">
+                        #{index + 1}
+                      </span>
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={participant.user?.image} />
+                        <AvatarFallback className="text-xs">
+                          {participant.displayName?.[0] || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium text-sm truncate">
+                        {participant.displayName}
+                      </span>
+                    </div>
+                    <Badge variant={index === 0 ? "default" : "secondary"} className="text-xs">
+                      {getPlayerScore(participant.user?.id || '')}
+                    </Badge>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Chat Input */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Chat</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.target as HTMLFormElement)
+                const message = formData.get('message') as string
+                if (message.trim()) {
+                  // For now, we'll add it as a guess with special type
+                  console.log('Chat message:', message)
+                  ;(e.target as HTMLFormElement).reset()
+                }
+              }}
+              className="flex gap-2"
+            >
+              <Input
+                name="message"
+                placeholder="Type a message..."
+                className="flex-1 text-sm"
+                disabled={!gameState}
+              />
+              <Button type="submit" size="sm" variant="outline">
+                <Send className="h-3 w-3" />
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Song Intro Modal */}
       <Dialog open={showSongIntro} onOpenChange={setShowSongIntro}>
