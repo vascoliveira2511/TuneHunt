@@ -151,28 +151,36 @@ export async function GET(
 
       // Always refresh Deezer URLs for gameplay to ensure they're fresh
       let previewUrl = selectedSong.song.previewUrl
-      console.log(`🔍 Checking preview URL for ${selectedSong.song.title}: ${previewUrl}`)
+      console.log(`🔍 State API - Song: ${selectedSong.song.title}`)
+      console.log(`🔍 State API - Song ID: ${selectedSong.song.id}`)
+      console.log(`🔍 State API - SpotifyId: ${selectedSong.song.spotifyId}`)
+      console.log(`🔍 State API - Preview URL: ${previewUrl}`)
 
-      if (previewUrl && selectedSong.song.id.startsWith('deezer_')) {
-        console.log(`🔄 Refreshing Deezer URL for gameplay: ${selectedSong.song.id}`)
+      // Check both the song ID and spotifyId for Deezer tracks
+      const isDeezerTrack = selectedSong.song.id.startsWith('deezer_') ||
+                           (selectedSong.song.spotifyId && selectedSong.song.spotifyId.startsWith('deezer_'))
+
+      if (previewUrl && isDeezerTrack) {
+        const trackId = selectedSong.song.spotifyId || selectedSong.song.id
+        console.log(`🔄 State API - Refreshing Deezer URL for track: ${trackId}`)
         try {
-          const freshUrl = await refreshPreviewUrl(selectedSong.song.id, previewUrl)
-          if (freshUrl) {
+          const freshUrl = await refreshPreviewUrl(trackId, previewUrl)
+          if (freshUrl && freshUrl !== previewUrl) {
             previewUrl = freshUrl
-            console.log(`✅ Got fresh URL: ${freshUrl}`)
+            console.log(`✅ State API - Updated with fresh URL: ${freshUrl}`)
             // Update database with fresh URL
             await prisma.song.update({
               where: { id: selectedSong.song.id },
               data: { previewUrl: freshUrl }
             })
           } else {
-            console.log(`⚠️ Could not get fresh URL, keeping existing: ${previewUrl}`)
+            console.log(`⚠️ State API - No fresh URL available, keeping: ${previewUrl}`)
           }
         } catch (error) {
-          console.error(`❌ Error refreshing URL:`, error)
+          console.error(`❌ State API - Error refreshing URL:`, error)
         }
       } else {
-        console.log(`✅ Not a Deezer URL or no URL available`)
+        console.log(`✅ State API - Not a Deezer track (isDeezer: ${isDeezerTrack})`)
       }
 
       currentSong = {

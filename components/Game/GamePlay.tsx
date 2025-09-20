@@ -64,6 +64,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const [isAdvancingRound, setIsAdvancingRound] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('connected')
   const [retryCount, setRetryCount] = useState(0)
+  const [hasUserGesture, setHasUserGesture] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const playAudioRef = useRef<((url: string, serverStartTime?: number) => void) | null>(null)
 
@@ -99,6 +100,9 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const startServerRound = async () => {
     if (!isHost) return
 
+    // Mark that we have a user gesture for audio
+    setHasUserGesture(true)
+
     try {
       const response = await fetch(`/api/games/${gameId}/start-round`, {
         method: 'POST'
@@ -106,6 +110,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
 
       if (response.ok) {
         console.log('🎮 Server round started successfully')
+        console.log('✅ User gesture recorded - audio will be allowed')
         // The polling will pick up the state change and start audio/UI automatically
       } else {
         console.error('Failed to start server round:', response.status)
@@ -127,10 +132,8 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
           console.log('🎮 GamePlay: Loaded game state:', data)
           setGameState(data.gameState)
 
-          // Start playing if round has already started
-          if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
-            playAudio(data.gameState.currentSong.previewUrl)
-          }
+          // Don't auto-play on initial load - wait for user interaction
+          console.log('🎮 Game loaded, but not auto-playing audio (requires user gesture)')
         } else {
           console.error('Failed to load game state:', response.status)
         }
@@ -150,10 +153,8 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
 
           setGameState(prev => {
             if (!prev) {
-              // First load
-              if (data.gameState.isPlaying && data.gameState.currentSong.previewUrl) {
-                playAudioRef.current?.(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
-              }
+              // First load - don't auto-play audio
+              console.log('🎮 First game state load - not auto-playing audio')
               return data.gameState
             }
 
@@ -177,7 +178,12 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
             if (!prev.isPlaying && data.gameState.isPlaying) {
               console.log('▶️ Round started')
               if (data.gameState.currentSong.previewUrl) {
-                playAudioRef.current?.(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
+                if (hasUserGesture) {
+                  console.log('🎵 Playing audio with user gesture')
+                  playAudioRef.current?.(data.gameState.currentSong.previewUrl, data.gameState.roundStartTimestamp)
+                } else {
+                  console.log('⏸️ Cannot play audio - no user gesture yet')
+                }
               }
             }
 
@@ -622,6 +628,22 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
                 <Button onClick={startServerRound} size="sm" className="btn-premium">
                   <Play className="h-4 w-4 mr-2" />
                   Start Round
+                </Button>
+              )}
+
+              {!hasUserGesture && gameState.isPlaying && gameState.currentSong.previewUrl && (
+                <Button
+                  onClick={() => {
+                    setHasUserGesture(true)
+                    if (gameState.currentSong.previewUrl) {
+                      playAudioRef.current?.(gameState.currentSong.previewUrl, gameState.roundStartTimestamp)
+                    }
+                  }}
+                  size="sm"
+                  className="btn-premium"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Play Audio
                 </Button>
               )}
 
