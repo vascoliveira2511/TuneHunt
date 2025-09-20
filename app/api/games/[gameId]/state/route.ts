@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { refreshPreviewUrl, isDeezerUrlExpired } from "@/lib/refresh-preview-url"
 import type { Session } from "next-auth"
 
 interface Params {
@@ -103,12 +104,28 @@ export async function GET(
       }
 
       const playlistSong = playlist.songs[songIndex]
+
+      // Check if preview URL needs refreshing
+      let previewUrl = playlistSong.song.previewUrl
+      if (previewUrl && isDeezerUrlExpired(previewUrl)) {
+        console.log(`🔄 Preview URL expired for playlist song ${playlistSong.song.id}, refreshing...`)
+        const freshUrl = await refreshPreviewUrl(playlistSong.song.id, previewUrl)
+        if (freshUrl && freshUrl !== previewUrl) {
+          previewUrl = freshUrl
+          // Update database with fresh URL
+          await prisma.song.update({
+            where: { id: playlistSong.song.id },
+            data: { previewUrl: freshUrl }
+          })
+        }
+      }
+
       currentSong = {
         id: playlistSong.song.id,
         title: playlistSong.song.title,
         artist: playlistSong.song.artist,
         album: playlistSong.song.album,
-        previewUrl: playlistSong.song.previewUrl,
+        previewUrl: previewUrl,
         imageUrl: playlistSong.song.imageUrl,
         selectedBy: 'playlist'
       }
@@ -131,12 +148,28 @@ export async function GET(
       }
 
       const selectedSong = game.selectedSongs[songIndex]
+
+      // Check if preview URL needs refreshing
+      let previewUrl = selectedSong.song.previewUrl
+      if (previewUrl && isDeezerUrlExpired(previewUrl)) {
+        console.log(`🔄 Preview URL expired for selected song ${selectedSong.song.id}, refreshing...`)
+        const freshUrl = await refreshPreviewUrl(selectedSong.song.id, previewUrl)
+        if (freshUrl && freshUrl !== previewUrl) {
+          previewUrl = freshUrl
+          // Update database with fresh URL
+          await prisma.song.update({
+            where: { id: selectedSong.song.id },
+            data: { previewUrl: freshUrl }
+          })
+        }
+      }
+
       currentSong = {
         id: selectedSong.song.id,
         title: selectedSong.song.title,
         artist: selectedSong.song.artist,
         album: selectedSong.song.album,
-        previewUrl: selectedSong.song.previewUrl,
+        previewUrl: previewUrl,
         imageUrl: selectedSong.song.imageUrl,
         selectedBy: selectedSong.selectedBy || null
       }
