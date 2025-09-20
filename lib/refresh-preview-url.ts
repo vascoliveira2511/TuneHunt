@@ -4,29 +4,24 @@ import { deezer } from './deezer'
  * Checks if a Deezer preview URL is expired and fetches a fresh one if needed
  */
 export async function refreshPreviewUrl(trackId: string, currentUrl: string | null): Promise<string | null> {
-  // If no current URL, we can't refresh
-  if (!currentUrl) {
-    return null
-  }
-
-  // Check if the URL looks like it might be expired by testing if it's accessible
+  // For Deezer URLs, always try to fetch a fresh one using the track ID
   try {
-    // For Deezer URLs, we can try to fetch a fresh one using the track ID
     if (trackId.startsWith('deezer_')) {
-      console.log(`🔄 Refreshing preview URL for track ${trackId}`)
+      console.log(`🔄 Fetching fresh preview URL for track ${trackId}`)
 
       const freshTrack = await deezer.getTrack(trackId)
 
-      if (freshTrack.preview_url && freshTrack.preview_url !== currentUrl) {
-        console.log(`✅ Got fresh preview URL for ${trackId}`)
+      if (freshTrack.preview_url) {
+        console.log(`✅ Got fresh preview URL for ${trackId}: ${freshTrack.preview_url}`)
         return freshTrack.preview_url
-      } else if (freshTrack.preview_url) {
-        console.log(`✅ Preview URL for ${trackId} is still valid`)
-        return freshTrack.preview_url
+      } else {
+        console.log(`❌ No preview URL available for ${trackId}`)
+        return null
       }
     }
 
-    // If we can't refresh or it's not a Deezer track, return the current URL
+    // If not a Deezer track, return the current URL
+    console.log(`ℹ️ Not a Deezer track, returning current URL: ${currentUrl}`)
     return currentUrl
 
   } catch (error) {
@@ -57,7 +52,10 @@ export function isDeezerUrlExpired(url: string): boolean {
 
         // Consider expired if within 5 minutes of expiration to be safe
         const buffer = 5 * 60 * 1000 // 5 minutes
-        return now >= (expTime - buffer)
+        const isExpired = now >= (expTime - buffer)
+
+        console.log(`🕐 URL expiration check: exp=${expTime}, now=${now}, buffer=${buffer}, expired=${isExpired}`)
+        return isExpired
       }
     }
   } catch (error) {

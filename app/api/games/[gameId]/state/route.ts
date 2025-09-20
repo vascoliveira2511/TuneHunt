@@ -149,19 +149,30 @@ export async function GET(
 
       const selectedSong = game.selectedSongs[songIndex]
 
-      // Check if preview URL needs refreshing
+      // Always refresh Deezer URLs for gameplay to ensure they're fresh
       let previewUrl = selectedSong.song.previewUrl
-      if (previewUrl && isDeezerUrlExpired(previewUrl)) {
-        console.log(`🔄 Preview URL expired for selected song ${selectedSong.song.id}, refreshing...`)
-        const freshUrl = await refreshPreviewUrl(selectedSong.song.id, previewUrl)
-        if (freshUrl && freshUrl !== previewUrl) {
-          previewUrl = freshUrl
-          // Update database with fresh URL
-          await prisma.song.update({
-            where: { id: selectedSong.song.id },
-            data: { previewUrl: freshUrl }
-          })
+      console.log(`🔍 Checking preview URL for ${selectedSong.song.title}: ${previewUrl}`)
+
+      if (previewUrl && selectedSong.song.id.startsWith('deezer_')) {
+        console.log(`🔄 Refreshing Deezer URL for gameplay: ${selectedSong.song.id}`)
+        try {
+          const freshUrl = await refreshPreviewUrl(selectedSong.song.id, previewUrl)
+          if (freshUrl) {
+            previewUrl = freshUrl
+            console.log(`✅ Got fresh URL: ${freshUrl}`)
+            // Update database with fresh URL
+            await prisma.song.update({
+              where: { id: selectedSong.song.id },
+              data: { previewUrl: freshUrl }
+            })
+          } else {
+            console.log(`⚠️ Could not get fresh URL, keeping existing: ${previewUrl}`)
+          }
+        } catch (error) {
+          console.error(`❌ Error refreshing URL:`, error)
         }
+      } else {
+        console.log(`✅ Not a Deezer URL or no URL available`)
       }
 
       currentSong = {

@@ -263,6 +263,24 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   const playAudio = useCallback(async (url: string, serverStartTime?: number) => {
     console.log('🎵 playAudio called with URL:', url, 'serverStartTime:', serverStartTime)
 
+    // Check if this looks like an expired Deezer URL
+    if (url.includes('dzcdn.net') && url.includes('hdnea=')) {
+      const urlObj = new URL(url)
+      const hdnea = urlObj.searchParams.get('hdnea')
+      if (hdnea) {
+        const expMatch = hdnea.match(/exp=(\d+)/)
+        if (expMatch) {
+          const expTime = parseInt(expMatch[1]) * 1000
+          const now = Date.now()
+          const timeUntilExp = expTime - now
+          console.log(`🕐 URL expires in ${Math.round(timeUntilExp / 1000)} seconds`)
+          if (timeUntilExp < 0) {
+            console.log('⚠️ URL is already expired!')
+          }
+        }
+      }
+    }
+
     // Stop current audio if playing
     if (audioRef.current) {
       audioRef.current.pause()
@@ -340,33 +358,64 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       }
     }
 
-    try {
-      // Try direct URL first
-      await tryPlayAudio(url, false)
-    } catch (directError) {
-      console.log('🔄 Direct audio failed, trying proxy...', directError)
+    // If URL looks expired, skip direct and go straight to proxy
+    const urlLooksExpired = url.includes('dzcdn.net') && url.includes('hdnea=')
+    let shouldTryProxy = false
 
+    if (urlLooksExpired) {
+      const urlObj = new URL(url)
+      const hdnea = urlObj.searchParams.get('hdnea')
+      if (hdnea) {
+        const expMatch = hdnea.match(/exp=(\d+)/)
+        if (expMatch) {
+          const expTime = parseInt(expMatch[1]) * 1000
+          const now = Date.now()
+          if (now >= expTime) {
+            console.log('🚫 URL is already expired, skipping direct attempt')
+            shouldTryProxy = true
+          }
+        }
+      }
+    }
+
+    if (shouldTryProxy) {
       try {
-        // Fallback to proxy
+        console.log('🔄 Going straight to proxy for expired URL')
         const proxyUrl = `/api/audio-proxy?url=${encodeURIComponent(url)}`
         await tryPlayAudio(proxyUrl, true)
       } catch (proxyError) {
-        console.error('❌ Both direct and proxy audio failed')
-        console.error('Direct error:', directError)
-        console.error('Proxy error:', proxyError)
-
-        // Show user-friendly message for browser restrictions
-        if (directError instanceof DOMException) {
-          if (directError.name === 'NotAllowedError') {
-            console.log('💡 Browser blocked autoplay. User interaction may be required.')
-          } else if (directError.name === 'NotSupportedError') {
-            console.log('💡 Audio format not supported or CORS issue.')
-            console.log('🔄 This is likely due to Deezer CORS restrictions when accessed directly.')
-          }
-        }
-
-        // Show user-friendly error
+        console.error('❌ Proxy audio failed for expired URL:', proxyError)
         console.log('⚠️ Audio playback failed - this can happen with some Deezer tracks due to licensing restrictions')
+      }
+    } else {
+      try {
+        // Try direct URL first
+        await tryPlayAudio(url, false)
+      } catch (directError) {
+        console.log('🔄 Direct audio failed, trying proxy...', directError)
+
+        try {
+          // Fallback to proxy
+          const proxyUrl = `/api/audio-proxy?url=${encodeURIComponent(url)}`
+          await tryPlayAudio(proxyUrl, true)
+        } catch (proxyError) {
+          console.error('❌ Both direct and proxy audio failed')
+          console.error('Direct error:', directError)
+          console.error('Proxy error:', proxyError)
+
+          // Show user-friendly message for browser restrictions
+          if (directError instanceof DOMException) {
+            if (directError.name === 'NotAllowedError') {
+              console.log('💡 Browser blocked autoplay. User interaction may be required.')
+            } else if (directError.name === 'NotSupportedError') {
+              console.log('💡 Audio format not supported or CORS issue.')
+              console.log('🔄 This is likely due to Deezer CORS restrictions when accessed directly.')
+            }
+          }
+
+          // Show user-friendly error
+          console.log('⚠️ Audio playback failed - this can happen with some Deezer tracks due to licensing restrictions')
+        }
       }
     }
   }, [])
