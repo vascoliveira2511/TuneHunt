@@ -94,18 +94,20 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
 
     console.log('🎵 Attempting to play preview:', track.preview_url)
 
-    try {
+    // Try direct URL first, then fallback to proxy
+    const tryPlayAudio = async (audioUrl: string, isProxy = false): Promise<void> => {
       const audio = new Audio()
       audio.volume = audioVolume
-      // Don't set crossOrigin for Deezer URLs as they may not support it
+      audio.preload = 'metadata'
       audioRef.current = audio
 
-      // Set source
-      audio.src = track.preview_url
-
-      // Add load event handler
+      // Add all event listeners before setting source
       audio.addEventListener('loadstart', () => {
-        console.log('🎵 Audio load started')
+        console.log('🎵 Audio load started', isProxy ? '(via proxy)' : '(direct)')
+      })
+
+      audio.addEventListener('loadeddata', () => {
+        console.log('🎵 Audio data loaded')
       })
 
       audio.addEventListener('canplay', () => {
@@ -113,35 +115,71 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
       })
 
       audio.addEventListener('error', (e) => {
-        console.error('🚫 Audio error event:', e)
-        setPlayingTrack(null)
+        console.error('🚫 Audio error event:', e, 'Error code:', audio.error?.code, 'Message:', audio.error?.message)
+        throw new Error(`Audio error: ${audio.error?.code}`)
       })
 
-      // Load the audio first
-      audio.load()
+      // Set source and load
+      audio.src = audioUrl
+      console.log('🎵 Set audio source to:', audioUrl)
+
+      // Wait for the audio to be ready before trying to play
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Audio load timeout')), 10000)
+
+        audio.addEventListener('canplaythrough', () => {
+          clearTimeout(timeout)
+          resolve(undefined)
+        }, { once: true })
+
+        audio.addEventListener('error', () => {
+          clearTimeout(timeout)
+          reject(new Error('Audio load failed'))
+        }, { once: true })
+
+        audio.load()
+      })
 
       await audio.play()
-      console.log('✅ Preview playing successfully')
+      console.log('✅ Preview playing successfully', isProxy ? '(via proxy)' : '(direct)')
       setPlayingTrack(track.id)
 
       audio.onended = () => {
         console.log('🔚 Preview ended')
         setPlayingTrack(null)
       }
+    }
 
-    } catch (error) {
-      console.error('❌ Failed to play preview:', error)
-      console.error('URL:', track.preview_url)
+    try {
+      // Try direct URL first
+      await tryPlayAudio(track.preview_url, false)
+    } catch (directError) {
+      console.log('🔄 Direct audio failed, trying proxy...', directError)
 
-      // Show user-friendly message for browser restrictions
-      if (error instanceof DOMException) {
-        if (error.name === 'NotAllowedError') {
-          console.log('💡 Browser blocked autoplay. User interaction may be required.')
-        } else if (error.name === 'NotSupportedError') {
-          console.log('💡 Audio format not supported or CORS issue.')
+      try {
+        // Fallback to proxy
+        const proxyUrl = `/api/audio-proxy?url=${encodeURIComponent(track.preview_url)}`
+        await tryPlayAudio(proxyUrl, true)
+      } catch (proxyError) {
+        console.error('❌ Both direct and proxy audio failed')
+        console.error('Direct error:', directError)
+        console.error('Proxy error:', proxyError)
+        console.error('URL:', track.preview_url)
+
+        // Show user-friendly message for browser restrictions
+        if (directError instanceof DOMException) {
+          if (directError.name === 'NotAllowedError') {
+            console.log('💡 Browser blocked autoplay. User interaction may be required.')
+          } else if (directError.name === 'NotSupportedError') {
+            console.log('💡 Audio format not supported or CORS issue.')
+            console.log('🔄 This is likely due to Deezer CORS restrictions when accessed directly.')
+          }
         }
+
+        // Show user-friendly error
+        console.log('⚠️ Preview not available - this can happen with some Deezer tracks due to licensing restrictions')
+        setPlayingTrack(null)
       }
-      setPlayingTrack(null)
     }
   }
 

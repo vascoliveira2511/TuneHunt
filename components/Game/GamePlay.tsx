@@ -268,15 +268,20 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       audioRef.current.pause()
     }
 
-    try {
+    // Try direct URL first, then fallback to proxy
+    const tryPlayAudio = async (audioUrl: string, isProxy = false): Promise<void> => {
       const audio = new Audio()
       audio.volume = 0.3
-      // Don't set crossOrigin for Deezer URLs as they may not support it
+      audio.preload = 'metadata'
       audioRef.current = audio
 
-      // Add event listeners for debugging
+      // Add all event listeners before setting source
       audio.addEventListener('loadstart', () => {
-        console.log('🎵 Audio load started')
+        console.log('🎵 Audio load started', isProxy ? '(via proxy)' : '(direct)')
+      })
+
+      audio.addEventListener('loadeddata', () => {
+        console.log('🎵 Audio data loaded')
       })
 
       audio.addEventListener('canplay', () => {
@@ -284,14 +289,30 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
       })
 
       audio.addEventListener('error', (e) => {
-        console.error('🚫 Audio error event:', e)
+        console.error('🚫 Audio error event:', e, 'Error code:', audio.error?.code, 'Message:', audio.error?.message)
+        throw new Error(`Audio error: ${audio.error?.code}`)
       })
 
       // Set source
-      audio.src = url
+      audio.src = audioUrl
+      console.log('🎵 Set audio source to:', audioUrl)
 
-      // Load the audio first
-      audio.load()
+      // Wait for the audio to be ready before trying to play
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Audio load timeout')), 10000)
+
+        audio.addEventListener('canplaythrough', () => {
+          clearTimeout(timeout)
+          resolve(undefined)
+        }, { once: true })
+
+        audio.addEventListener('error', () => {
+          clearTimeout(timeout)
+          reject(new Error('Audio load failed'))
+        }, { once: true })
+
+        audio.load()
+      })
 
       // Calculate audio sync offset if server start time is provided
       if (serverStartTime) {
@@ -309,7 +330,7 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
 
       console.log('🔊 Attempting to play audio...')
       await audio.play()
-      console.log('✅ Audio playing successfully')
+      console.log('✅ Audio playing successfully', isProxy ? '(via proxy)' : '(direct)')
 
       setGameState(prev => prev ? { ...prev, isPlaying: true } : prev)
 
@@ -317,17 +338,35 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
         console.log('🔚 Audio ended')
         setGameState(prev => prev ? { ...prev, isPlaying: false } : prev)
       }
+    }
 
-    } catch (error) {
-      console.error('❌ Audio play failed:', error)
+    try {
+      // Try direct URL first
+      await tryPlayAudio(url, false)
+    } catch (directError) {
+      console.log('🔄 Direct audio failed, trying proxy...', directError)
 
-      // Show user-friendly message for browser restrictions
-      if (error instanceof DOMException) {
-        if (error.name === 'NotAllowedError') {
-          console.log('💡 Browser blocked autoplay. User interaction may be required.')
-        } else if (error.name === 'NotSupportedError') {
-          console.log('💡 Audio format not supported or CORS issue.')
+      try {
+        // Fallback to proxy
+        const proxyUrl = `/api/audio-proxy?url=${encodeURIComponent(url)}`
+        await tryPlayAudio(proxyUrl, true)
+      } catch (proxyError) {
+        console.error('❌ Both direct and proxy audio failed')
+        console.error('Direct error:', directError)
+        console.error('Proxy error:', proxyError)
+
+        // Show user-friendly message for browser restrictions
+        if (directError instanceof DOMException) {
+          if (directError.name === 'NotAllowedError') {
+            console.log('💡 Browser blocked autoplay. User interaction may be required.')
+          } else if (directError.name === 'NotSupportedError') {
+            console.log('💡 Audio format not supported or CORS issue.')
+            console.log('🔄 This is likely due to Deezer CORS restrictions when accessed directly.')
+          }
         }
+
+        // Show user-friendly error
+        console.log('⚠️ Audio playback failed - this can happen with some Deezer tracks due to licensing restrictions')
       }
     }
   }, [])
