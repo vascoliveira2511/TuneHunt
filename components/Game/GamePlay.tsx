@@ -260,45 +260,75 @@ export default function GamePlay({ gameId, currentUserId, isHost, participants, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, isHost, currentUserId, isAdvancingRound, retryCount])
 
-  const playAudio = useCallback((url: string, serverStartTime?: number) => {
+  const playAudio = useCallback(async (url: string, serverStartTime?: number) => {
     console.log('🎵 playAudio called with URL:', url, 'serverStartTime:', serverStartTime)
 
     // Stop current audio if playing
     if (audioRef.current) {
       audioRef.current.pause()
     }
-    const audio = new Audio(url)
-    audio.volume = 0.3
-    audioRef.current = audio
 
-    // Calculate audio sync offset if server start time is provided
-    if (serverStartTime) {
-      const clientTime = Date.now()
-      const elapsedMs = clientTime - serverStartTime
-      const elapsedSeconds = Math.max(0, elapsedMs / 1000)
+    try {
+      const audio = new Audio()
+      audio.volume = 0.3
+      // Don't set crossOrigin for Deezer URLs as they may not support it
+      audioRef.current = audio
 
-      console.log('🎵 Audio sync - elapsed since server start:', elapsedSeconds, 'seconds')
+      // Add event listeners for debugging
+      audio.addEventListener('loadstart', () => {
+        console.log('🎵 Audio load started')
+      })
 
-      // Only apply offset if it's reasonable (not too far ahead)
-      if (elapsedSeconds < 30) {
-        audio.currentTime = elapsedSeconds
+      audio.addEventListener('canplay', () => {
+        console.log('🎵 Audio can play')
+      })
+
+      audio.addEventListener('error', (e) => {
+        console.error('🚫 Audio error event:', e)
+      })
+
+      // Set source
+      audio.src = url
+
+      // Load the audio first
+      audio.load()
+
+      // Calculate audio sync offset if server start time is provided
+      if (serverStartTime) {
+        const clientTime = Date.now()
+        const elapsedMs = clientTime - serverStartTime
+        const elapsedSeconds = Math.max(0, elapsedMs / 1000)
+
+        console.log('🎵 Audio sync - elapsed since server start:', elapsedSeconds, 'seconds')
+
+        // Only apply offset if it's reasonable (not too far ahead)
+        if (elapsedSeconds < 30) {
+          audio.currentTime = elapsedSeconds
+        }
       }
-    }
 
-    console.log('🔊 Attempting to play audio...')
-    audio.play()
-      .then(() => {
-        console.log('✅ Audio playing successfully')
-      })
-      .catch((error) => {
-        console.error('❌ Audio play failed:', error)
-      })
-    
-    setGameState(prev => prev ? { ...prev, isPlaying: true } : prev)
+      console.log('🔊 Attempting to play audio...')
+      await audio.play()
+      console.log('✅ Audio playing successfully')
 
-    audio.onended = () => {
-      console.log('🔚 Audio ended')
-      setGameState(prev => prev ? { ...prev, isPlaying: false } : prev)
+      setGameState(prev => prev ? { ...prev, isPlaying: true } : prev)
+
+      audio.onended = () => {
+        console.log('🔚 Audio ended')
+        setGameState(prev => prev ? { ...prev, isPlaying: false } : prev)
+      }
+
+    } catch (error) {
+      console.error('❌ Audio play failed:', error)
+
+      // Show user-friendly message for browser restrictions
+      if (error instanceof DOMException) {
+        if (error.name === 'NotAllowedError') {
+          console.log('💡 Browser blocked autoplay. User interaction may be required.')
+        } else if (error.name === 'NotSupportedError') {
+          console.log('💡 Audio format not supported or CORS issue.')
+        }
+      }
     }
   }, [])
 

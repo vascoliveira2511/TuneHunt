@@ -73,7 +73,7 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
     }
   }
 
-  const playPreview = (track: SpotifyTrack) => {
+  const playPreview = async (track: SpotifyTrack) => {
     if (!track.preview_url) {
       console.warn('No preview URL available for track:', track.name)
       return
@@ -94,36 +94,53 @@ export default function MusicSearch({ onTrackSelect, selectedTracks = [] }: Musi
 
     console.log('🎵 Attempting to play preview:', track.preview_url)
 
-    const audio = new Audio()
-    audio.volume = audioVolume
-    audioRef.current = audio
+    try {
+      const audio = new Audio()
+      audio.volume = audioVolume
+      // Don't set crossOrigin for Deezer URLs as they may not support it
+      audioRef.current = audio
 
-    // Set source
-    audio.src = track.preview_url
+      // Set source
+      audio.src = track.preview_url
 
-    audio.play()
-      .then(() => {
-        console.log('✅ Preview playing successfully')
-        setPlayingTrack(track.id)
+      // Add load event handler
+      audio.addEventListener('loadstart', () => {
+        console.log('🎵 Audio load started')
       })
-      .catch((error) => {
-        console.error('❌ Failed to play preview:', error)
-        console.error('URL:', track.preview_url)
 
-        // Show user-friendly message for CORS issues
-        if (track.preview_url && track.preview_url.includes('dzcdn.net')) {
-          console.log('💡 This Deezer track preview cannot play due to browser restrictions. This is a known limitation.')
-        }
+      audio.addEventListener('canplay', () => {
+        console.log('🎵 Audio can play')
+      })
+
+      audio.addEventListener('error', (e) => {
+        console.error('🚫 Audio error event:', e)
         setPlayingTrack(null)
       })
 
-    audio.onended = () => {
-      console.log('🔚 Preview ended')
-      setPlayingTrack(null)
-    }
+      // Load the audio first
+      audio.load()
 
-    audio.onerror = () => {
-      console.error('🚫 Audio error occurred')
+      await audio.play()
+      console.log('✅ Preview playing successfully')
+      setPlayingTrack(track.id)
+
+      audio.onended = () => {
+        console.log('🔚 Preview ended')
+        setPlayingTrack(null)
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to play preview:', error)
+      console.error('URL:', track.preview_url)
+
+      // Show user-friendly message for browser restrictions
+      if (error instanceof DOMException) {
+        if (error.name === 'NotAllowedError') {
+          console.log('💡 Browser blocked autoplay. User interaction may be required.')
+        } else if (error.name === 'NotSupportedError') {
+          console.log('💡 Audio format not supported or CORS issue.')
+        }
+      }
       setPlayingTrack(null)
     }
   }
